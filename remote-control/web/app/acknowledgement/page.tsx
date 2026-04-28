@@ -82,7 +82,7 @@ export default function AcknowledgementPage() {
     <main style={main}>
       <h1 style={{ marginTop: 0 }}>Operator safety acknowledgement</h1>
       <p style={copy}>
-        SetuLink admin access can execute commands on devices, transfer files, restart services, and apply upgrades.
+        NetraLink admin access can execute commands on devices, transfer files, restart services, and apply upgrades.
       </p>
       <p style={copy}>
         Operators are responsible for using actions carefully. High-risk actions require action-time confirmation.

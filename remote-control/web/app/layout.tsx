@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SetuLink",
+  title: "NetraLink",
   description: "Remote device operations, health visibility, and restricted access control.",
 };
 

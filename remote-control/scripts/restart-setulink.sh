@@ -395,14 +395,14 @@ configure_checks() {
     "FRONTEND_LOCAL|Frontend local|${FRONTEND_LOCAL_URL}|<html"
     "ROUTER_LOCAL|Origin router local|${ROUTER_LOCAL_URL}|<html"
     "ADMIN_LOCAL|Admin login local|${FRONTEND_LOCAL_URL}/admin|Admin Login"
-    "REMOTEACCESS_LOCAL|RemoteAccess local|${FRONTEND_LOCAL_URL}/remoteaccess|SetuLink Remote Access"
+    "REMOTEACCESS_LOCAL|RemoteAccess local|${FRONTEND_LOCAL_URL}/remoteaccess|NetraLink Remote Access"
   )
 
   PUBLIC_CHECKS=(
     "BACKEND_PUBLIC|Backend public|${BACKEND_PUBLIC_URL}|\"ok\":true"
     "FRONTEND_PUBLIC|Frontend public|${FRONTEND_PUBLIC_URL}|<html"
     "ADMIN_PUBLIC|Admin login public|${FRONTEND_PUBLIC_URL}/admin|Admin Login"
-    "REMOTEACCESS_PUBLIC|RemoteAccess public|${FRONTEND_PUBLIC_URL}/remoteaccess|SetuLink Remote Access"
+    "REMOTEACCESS_PUBLIC|RemoteAccess public|${FRONTEND_PUBLIC_URL}/remoteaccess|NetraLink Remote Access"
   )
 
   if [[ -f "$WEB_DIR/app/docs/runbook/[slug]/route.ts" ]]; then
@@ -470,8 +470,8 @@ config_presence_status() {
 }
 
 detect_webrtc_env() {
-  step "Remote-desktop WebRTC environment"
-  echo "Checking exported environment and server/.env presence only; secret values are not printed."
+  step "Remote-desktop relay environment"
+  echo "Remote desktop now uses the authenticated WebSocket relay path; TURN/STUN settings are legacy and not required for screen relay."
 
   STUN_STATUS="$(config_presence_status WEBRTC_STUN_URLS)"
   TURN_URLS_STATUS="$(config_presence_status WEBRTC_TURN_URLS)"
@@ -484,20 +484,18 @@ detect_webrtc_env() {
     TURN_STATUS="MISSING"
   fi
 
-  echo "WEBRTC_STUN_URLS: $STUN_STATUS"
-  echo "WEBRTC_TURN_URLS: $TURN_URLS_STATUS"
-  echo "WEBRTC_TURN_USERNAME: $TURN_USERNAME_STATUS"
-  echo "WEBRTC_TURN_CREDENTIAL: $TURN_CREDENTIAL_STATUS"
-
-  if [[ "$TURN_STATUS" != "CONFIGURED" ]]; then
-    echo "WARNING: TURN not configured: same-LAN or simple NAT tests may work, but reliable unattended WAN remote desktop will not be dependable."
-  fi
+  echo "WEBSOCKET_RELAY: ENABLED"
+  echo "WEBRTC_STUN_URLS: $STUN_STATUS (legacy)"
+  echo "WEBRTC_TURN_URLS: $TURN_URLS_STATUS (legacy)"
+  echo "WEBRTC_TURN_USERNAME: $TURN_USERNAME_STATUS (legacy)"
+  echo "WEBRTC_TURN_CREDENTIAL: $TURN_CREDENTIAL_STATUS (legacy)"
 }
 
 print_remote_desktop_notes() {
   step "Remote-desktop readiness notes"
-  echo "Remote desktop signaling foundation deployed when backend/web checks pass."
-  echo "Real live desktop on Windows agents still depends on bundled ffmpeg or system ffmpeg fallback, interactive desktop/session capture, and TURN for reliable WAN/NAT traversal if needed."
+  echo "Remote desktop relay is deployed when backend/web checks pass."
+  echo "Real live desktop on Windows agents depends on the updated agent helper process launching in the active user session."
+  echo "TURN/STUN and ffmpeg are legacy WebRTC capture checks and are not required for the WebSocket JPEG relay."
 }
 
 print_log_tail() {
@@ -589,12 +587,10 @@ print_summary() {
     printf "Docs troubleshooting public: %s\n" "$DOCS_TROUBLESHOOTING_PUBLIC_STATUS"
   fi
   printf "\n--- Remote Desktop Readiness ---\n"
-  printf "STUN: %s\n" "$STUN_STATUS"
-  printf "TURN: %s\n" "$TURN_STATUS"
-  printf "Remote desktop: signaling foundation restarted; Windows live desktop runtime readiness still depends on bundled/system ffmpeg, interactive capture, and TURN when WAN/NAT requires it.\n"
-  if [[ "$TURN_STATUS" != "CONFIGURED" ]]; then
-    printf "\nTURN not configured: same-LAN or simple NAT tests may work, but reliable unattended WAN remote desktop will not be dependable.\n"
-  fi
+  printf "WEBSOCKET RELAY: ENABLED\n"
+  printf "STUN: %s (legacy)\n" "$STUN_STATUS"
+  printf "TURN: %s (legacy)\n" "$TURN_STATUS"
+  printf "Remote desktop: WebSocket JPEG relay restarted; Windows live desktop runtime readiness depends on the updated agent helper running in the active user session.\n"
   printf "Backend local URL: %s\n" "$BACKEND_LOCAL_URL"
   printf "Frontend local URL: %s\n" "$FRONTEND_LOCAL_URL"
   printf "Origin router local URL: %s\n" "$ROUTER_LOCAL_URL"

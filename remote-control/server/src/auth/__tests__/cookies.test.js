@@ -23,7 +23,7 @@ test('setAdminCookies uses secure session cookie options', () => {
   setAdminCookies(res, {
     accessToken: 'access',
     refreshToken: 'refresh',
-  }, reqForHost('setuapi.shivomsangha.com'));
+  }, reqForHost('netraapi.shivomsangha.com'));
 
   assert.equal(cookies.length, 2);
   assert.deepEqual(cookies.map((cookie) => cookie.name), ['session', 'refresh_session']);

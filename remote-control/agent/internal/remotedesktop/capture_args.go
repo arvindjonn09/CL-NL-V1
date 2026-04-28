@@ -10,6 +10,7 @@ func captureCommandArgs() []string {
 	return []string{
 		"-hide_banner",
 		"-loglevel", "warning",
+		"-probesize", "42M",
 		"-f", "gdigrab",
 		"-framerate", "24",
 		"-i", "desktop",

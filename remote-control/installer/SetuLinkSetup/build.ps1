@@ -1,7 +1,7 @@
 param(
   [string]$GoExe = "go",
   [string]$InnoSetupCompiler = "",
-  [string]$DefaultBackendURL = "https://setuapi.shivomsangha.com",
+  [string]$DefaultBackendURL = "https://netraapi.shivomsangha.com",
   [string]$Version = "0.1.0",
   [switch]$Clean,
   [switch]$SkipAgentBuild,
@@ -194,8 +194,8 @@ if ([string]::IsNullOrWhiteSpace($DefaultBackendURL)) {
 }
 
 $normalizedDefaultBackendURL = $DefaultBackendURL.Trim().TrimEnd("/").ToLowerInvariant()
-if ($normalizedDefaultBackendURL -eq "https://setulink.shivomsangha.com" -or $normalizedDefaultBackendURL -eq "http://setulink.shivomsangha.com") {
-  throw "DefaultBackendURL must point to the API host, e.g. https://setuapi.shivomsangha.com"
+if ($normalizedDefaultBackendURL -eq "https://netralink.shivomsangha.com" -or $normalizedDefaultBackendURL -eq "http://netralink.shivomsangha.com") {
+  throw "DefaultBackendURL must point to the API host, e.g. https://netraapi.shivomsangha.com"
 }
 
 $setupRoot = Split-Path -Parent $MyInvocation.MyCommand.Path

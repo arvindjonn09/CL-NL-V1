@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate, healthLabel, shortText, statusBadge } from '../../../devices/statusStyles';
 import { remoteAccessApiUrl } from '../../apiBase';
 
@@ -47,10 +47,6 @@ type DeviceDetail = {
     state?: string | null;
     reason?: string | null;
     label?: string | null;
-    transport?: {
-      wired?: boolean;
-      state?: string | null;
-    } | null;
   };
   remoteDesktop?: {
     supported: boolean;
@@ -58,134 +54,26 @@ type DeviceDetail = {
     state?: string | null;
     reason?: string | null;
     label?: string | null;
-    ice?: {
-      iceServers?: RTCIceServer[];
-      configured?: boolean;
-      mode?: string;
-      warning?: string | null;
-    };
     runtime?: {
+      relay?: string;
       webrtcSignaling?: string;
       screenCapture?: string;
       input?: string;
-      mediaTransport?: string;
-      agentState?: string;
-      reason?: string | null;
     };
   };
   recentRemoteDesktopSessions?: Array<{
     id: string;
     status: string;
-    signaling_state?: string | null;
-    transport_state?: string | null;
     created_at?: string | null;
-    ended_at?: string | null;
     failure_reason?: string | null;
   }>;
 };
-
-type ConnectMode = 'idle' | 'available' | 'connecting' | 'waiting' | 'signaling' | 'connected' | 'disconnected' | 'expired' | 'unavailable' | 'failed';
-
-type DesktopSession = {
-  id: string;
-  status: string;
-  signalingState?: string | null;
-  transportState?: string | null;
-  failureReason?: string | null;
-  agentAnswer?: RTCSessionDescriptionInit | null;
-  agentIce?: RTCIceCandidateInit[];
-  ice?: {
-    iceServers?: RTCIceServer[];
-    summary?: Array<{
-      urlTypes?: string[];
-      hasUsername?: boolean;
-      hasCredential?: boolean;
-    }>;
-    warning?: string | null;
-    mode?: string;
-  };
-};
-
-function browserIceCandidateType(candidate?: RTCIceCandidateInit | RTCIceCandidate | null) {
-  const text = String(candidate?.candidate || '');
-  const match = text.match(/\btyp\s+([a-z0-9-]+)/i);
-  return match ? match[1] : 'unknown';
-}
 
 export default function RemoteAccessDevicePage() {
   const params = useParams<{ id: string }>();
   const id = String(params.id || '');
   const [detail, setDetail] = useState<DeviceDetail | null>(null);
   const [mode, setMode] = useState<'loading' | 'ready' | 'denied' | 'login' | 'error'>('loading');
-  const [connectMode, setConnectMode] = useState<ConnectMode>('idle');
-  const [connectMessage, setConnectMessage] = useState('');
-  const [desktopSession, setDesktopSession] = useState<DesktopSession | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const peerRef = useRef<RTCPeerConnection | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const controlRef = useRef<RTCDataChannel | null>(null);
-  const appliedAgentIce = useRef(new Set<string>());
-  const mediaActivatedRef = useRef(false);
-  const peerDisconnectTimerRef = useRef<number | null>(null);
-  const selectedPairLogRef = useRef('');
-
-  function desktopLog(stage: string, fields: Record<string, unknown> = {}) {
-    const sessionId = fields.sessionId || desktopSession?.id || 'pending';
-    console.info('remote-desktop', { stage, sessionId, ...fields });
-  }
-
-  async function logSelectedCandidatePair(peer: RTCPeerConnection, sessionId: string, stage: string) {
-    try {
-      const stats = await peer.getStats();
-      let selectedPair: RTCStats | null = null;
-      stats.forEach((report) => {
-        if (report.type === 'transport') {
-          const selectedCandidatePairId = (report as RTCTransportStats).selectedCandidatePairId;
-          if (selectedCandidatePairId) selectedPair = stats.get(selectedCandidatePairId) || selectedPair;
-        }
-      });
-      stats.forEach((report) => {
-        const looseReport = report as RTCIceCandidatePairStats & { selected?: boolean };
-        if (!selectedPair && report.type === 'candidate-pair' && looseReport.selected) {
-          selectedPair = report;
-        }
-      });
-      if (!selectedPair) return;
-      const pair = selectedPair as RTCIceCandidatePairStats;
-      const local = stats.get(pair.localCandidateId || '') as (RTCStats & { candidateType?: string }) | undefined;
-      const remote = stats.get(pair.remoteCandidateId || '') as (RTCStats & { candidateType?: string }) | undefined;
-      const key = `${stage}:${local?.candidateType || 'unknown'}:${remote?.candidateType || 'unknown'}:${pair.state}`;
-      if (selectedPairLogRef.current === key) return;
-      selectedPairLogRef.current = key;
-      desktopLog('selected-candidate-pair', {
-        sessionId,
-        stage,
-        state: pair.state,
-        localCandidateType: local?.candidateType || 'unknown',
-        remoteCandidateType: remote?.candidateType || 'unknown',
-        nominated: pair.nominated,
-      });
-    } catch (err) {
-      desktopLog('selected-candidate-pair-unavailable', {
-        sessionId,
-        stage,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  function clearPeerDisconnectTimer() {
-    if (peerDisconnectTimerRef.current === null) return;
-    window.clearTimeout(peerDisconnectTimerRef.current);
-    peerDisconnectTimerRef.current = null;
-  }
-
-  useEffect(() => () => {
-    if (peerDisconnectTimerRef.current !== null) {
-      window.clearTimeout(peerDisconnectTimerRef.current);
-      peerDisconnectTimerRef.current = null;
-    }
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -197,18 +85,9 @@ export default function RemoteAccessDevicePage() {
           cache: 'no-store',
         });
         if (!active) return;
-        if (res.status === 401) {
-          setMode('login');
-          return;
-        }
-        if (res.status === 404 || res.status === 403) {
-          setMode('denied');
-          return;
-        }
-        if (!res.ok) {
-          setMode('error');
-          return;
-        }
+        if (res.status === 401) { setMode('login'); return; }
+        if (res.status === 404 || res.status === 403) { setMode('denied'); return; }
+        if (!res.ok) { setMode('error'); return; }
         setDetail(await res.json());
         setMode('ready');
       } catch {
@@ -217,356 +96,11 @@ export default function RemoteAccessDevicePage() {
     }
 
     if (id) loadDevice();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [id]);
 
-  useEffect(() => {
-    if (videoRef.current && remoteStream) {
-      videoRef.current.srcObject = remoteStream;
-      desktopLog('video-src-object-attached', {
-        trackCount: remoteStream.getTracks().length,
-        videoTrackCount: remoteStream.getVideoTracks().length,
-      });
-    }
-  }, [remoteStream]);
-
-  async function applyAgentSignals(session: DesktopSession) {
-    const peer = peerRef.current;
-    if (!peer) return;
-    if (session.agentAnswer && !peer.currentRemoteDescription) {
-      await peer.setRemoteDescription(session.agentAnswer);
-      desktopLog('remote-answer-applied', {
-        sessionId: session.id,
-        signalingState: peer.signalingState,
-      });
-    }
-    if (!peer.currentRemoteDescription) return;
-    for (const candidate of session.agentIce || []) {
-      const key = JSON.stringify(candidate);
-      if (appliedAgentIce.current.has(key)) continue;
-      await peer.addIceCandidate(candidate).then(() => {
-        appliedAgentIce.current.add(key);
-        desktopLog('agent-ice-applied', {
-          sessionId: session.id,
-          candidateType: browserIceCandidateType(candidate),
-        });
-      }).catch((err) => {
-        desktopLog('agent-ice-rejected', {
-          sessionId: session.id,
-          candidateType: browserIceCandidateType(candidate),
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
-  }
-
-  useEffect(() => {
-    if (!desktopSession || connectMode === 'connected' || connectMode === 'failed' || connectMode === 'expired') {
-      return undefined;
-    }
-
-    let active = true;
-    const timer = window.setInterval(async () => {
-      try {
-        const res = await fetch(remoteAccessApiUrl(`/api/remoteaccess/desktop/sessions/${encodeURIComponent(desktopSession.id)}`), {
-          credentials: 'include',
-          cache: 'no-store',
-        });
-        if (!active || !res.ok) return;
-        const body = await res.json();
-        const session = body.session as DesktopSession;
-        setDesktopSession(session);
-        await applyAgentSignals(session);
-
-        if (session.status === 'connected' && remoteStream) {
-          setConnectMode('connected');
-          setConnectMessage('Remote desktop media is live.');
-        } else if (session.status === 'failed') {
-          setConnectMode('failed');
-          setConnectMessage(session.failureReason || (session.transportState === 'failed' ? 'Remote desktop failed.' : 'Remote desktop is not ready on the device yet.'));
-        } else if (session.status === 'expired') {
-          setConnectMode('expired');
-          setConnectMessage('Remote desktop session expired.');
-        } else if (session.status === 'ended') {
-          setConnectMode('disconnected');
-          setConnectMessage('Remote desktop session ended.');
-        } else if (session.status === 'media_starting') {
-          setConnectMode('waiting');
-          setConnectMessage('Device answered. Waiting for live desktop media...');
-        } else if (session.signalingState === 'offer-received' || session.status === 'signaling' || session.status === 'waiting_for_agent') {
-          setConnectMode('waiting');
-          setConnectMessage('Waiting for the device to answer the WebRTC offer...');
-        }
-      } catch {
-        if (active) {
-          setConnectMode('failed');
-          setConnectMessage('Could not update remote desktop session state.');
-        }
-      }
-    }, 750);
-
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [desktopSession, connectMode, remoteStream]);
-
-  async function connect() {
-    setConnectMode('connecting');
-    setConnectMessage('Preparing unattended remote desktop session...');
-    try {
-      const res = await fetch(remoteAccessApiUrl(`/api/remoteaccess/devices/${encodeURIComponent(id)}/connect`), {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: '{}',
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 401) {
-        setConnectMode('failed');
-        setConnectMessage('Your remote-access session expired. Sign in again to continue.');
-        return;
-      }
-      if (!res.ok) {
-        setConnectMode(res.status === 409 || res.status === 503 ? 'unavailable' : 'failed');
-        setConnectMessage(body.error || 'Remote connection is not available right now.');
-        return;
-      }
-
-      const session = body.desktopSession as DesktopSession | undefined;
-      if (!session?.id) {
-        setConnectMode('failed');
-        setConnectMessage('Remote desktop session was not created.');
-        return;
-      }
-      setDesktopSession(session);
-      await startWebRtcSignaling(session);
-    } catch {
-      setConnectMode('failed');
-      setConnectMessage('Could not prepare the remote session. Try again shortly.');
-    }
-  }
-
-  async function startWebRtcSignaling(session: DesktopSession) {
-    if (!('RTCPeerConnection' in window)) {
-      setConnectMode('failed');
-      setConnectMessage('This browser does not support WebRTC remote desktop sessions.');
-      return;
-    }
-
-    setConnectMode('signaling');
-    setConnectMessage('Creating WebRTC offer...');
-    const peer = new RTCPeerConnection({
-      iceServers: session.ice?.iceServers || [],
-    });
-    desktopLog('peer-created', {
-      sessionId: session.id,
-      iceMode: session.ice?.mode || null,
-      iceServerSummary: session.ice?.summary || [],
-    });
-    peerRef.current = peer;
-    appliedAgentIce.current = new Set();
-    clearPeerDisconnectTimer();
-    selectedPairLogRef.current = '';
-
-    controlRef.current = peer.createDataChannel('setulink-control');
-    controlRef.current.onopen = () => {
-      desktopLog('data-channel-open', { sessionId: session.id });
-      setConnectMode('waiting');
-      setConnectMessage('Control channel ready. Waiting for desktop media...');
-    };
-    controlRef.current.onclose = () => {
-      desktopLog('data-channel-close', { sessionId: session.id });
-      if (connectMode === 'connected') {
-        setConnectMode('disconnected');
-        setConnectMessage('Remote desktop control channel closed.');
-      }
-    };
-
-    peer.ontrack = (event) => {
-      const [stream] = event.streams;
-      desktopLog('track-received', {
-        sessionId: session.id,
-        trackKind: event.track.kind,
-        streamCount: event.streams.length,
-      });
-      if (stream) setRemoteStream(stream);
-    };
-    peer.onicegatheringstatechange = () => {
-      desktopLog('ice-gathering-state', {
-        sessionId: session.id,
-        state: peer.iceGatheringState,
-      });
-    };
-    peer.oniceconnectionstatechange = () => {
-      desktopLog('ice-connection-state', {
-        sessionId: session.id,
-        state: peer.iceConnectionState,
-      });
-      void logSelectedCandidatePair(peer, session.id, `ice-${peer.iceConnectionState}`);
-    };
-    peer.onsignalingstatechange = () => {
-      desktopLog('signaling-state', {
-        sessionId: session.id,
-        state: peer.signalingState,
-      });
-    };
-    peer.onconnectionstatechange = () => {
-      desktopLog('peer-connection-state', {
-        sessionId: session.id,
-        state: peer.connectionState,
-        iceConnectionState: peer.iceConnectionState,
-        signalingState: peer.signalingState,
-      });
-      void logSelectedCandidatePair(peer, session.id, `peer-${peer.connectionState}`);
-      if (peer.connectionState === 'connected') {
-        clearPeerDisconnectTimer();
-        setConnectMode('waiting');
-        setConnectMessage('WebRTC peer connected. Waiting for live desktop media...');
-      }
-      if (peer.connectionState === 'disconnected') {
-        setConnectMode('waiting');
-        setConnectMessage('WebRTC connection was interrupted. Waiting for it to recover...');
-        clearPeerDisconnectTimer();
-        peerDisconnectTimerRef.current = window.setTimeout(() => {
-          peerDisconnectTimerRef.current = null;
-          if (peerRef.current !== peer) return;
-          if (peer.connectionState !== 'disconnected') return;
-          setConnectMode('disconnected');
-          setConnectMessage('Remote desktop WebRTC connection is no longer active.');
-        }, 10000);
-      }
-      if (peer.connectionState === 'failed' || peer.connectionState === 'closed') {
-        clearPeerDisconnectTimer();
-        setConnectMode(peer.connectionState === 'failed' ? 'failed' : 'disconnected');
-        setConnectMessage('Remote desktop WebRTC connection is no longer active.');
-      }
-    };
-    peer.onicecandidate = async (event) => {
-      if (!event.candidate) {
-        desktopLog('browser-ice-gathering-complete', { sessionId: session.id });
-        return;
-      }
-      desktopLog('browser-ice-generated', {
-        sessionId: session.id,
-        candidateType: browserIceCandidateType(event.candidate),
-      });
-      await fetch(remoteAccessApiUrl(`/api/remoteaccess/desktop/sessions/${encodeURIComponent(session.id)}/ice`), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate: event.candidate.toJSON() }),
-      }).catch(() => {});
-    };
-
-    const offer = await peer.createOffer({
-      offerToReceiveAudio: false,
-      offerToReceiveVideo: true,
-    });
-    await peer.setLocalDescription(offer);
-    desktopLog('local-offer-created', {
-      sessionId: session.id,
-      signalingState: peer.signalingState,
-    });
-    const offerRes = await fetch(remoteAccessApiUrl(`/api/remoteaccess/desktop/sessions/${encodeURIComponent(session.id)}/offer`), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offer }),
-    });
-    if (!offerRes.ok) {
-      setConnectMode('failed');
-      setConnectMessage('WebRTC signaling offer was rejected.');
-      return;
-    }
-    setConnectMode('waiting');
-    setConnectMessage(session.ice?.warning || 'Waiting for the device to answer the WebRTC offer...');
-  }
-
-  async function markMediaActive() {
-    if (!desktopSession?.id || mediaActivatedRef.current) return;
-    mediaActivatedRef.current = true;
-    desktopLog('media-active-posting', {
-      sessionId: desktopSession.id,
-      videoReadyState: videoRef.current?.readyState || null,
-      videoWidth: videoRef.current?.videoWidth || null,
-      videoHeight: videoRef.current?.videoHeight || null,
-    });
-    try {
-      const res = await fetch(remoteAccessApiUrl(`/api/remoteaccess/desktop/sessions/${encodeURIComponent(desktopSession.id)}/media-active`), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok && body.session) {
-        desktopLog('media-active-acknowledged', {
-          sessionId: desktopSession.id,
-          videoReadyState: videoRef.current?.readyState || null,
-          videoWidth: videoRef.current?.videoWidth || null,
-          videoHeight: videoRef.current?.videoHeight || null,
-        });
-        setDesktopSession(body.session);
-        setConnectMode('connected');
-        setConnectMessage('Remote desktop media is live.');
-        return;
-      }
-      mediaActivatedRef.current = false;
-      desktopLog('media-active-rejected', {
-        sessionId: desktopSession.id,
-        error: body.error || null,
-      });
-      setConnectMode('failed');
-      setConnectMessage(body.error || 'Desktop media arrived, but the session state could not be confirmed.');
-    } catch {
-      mediaActivatedRef.current = false;
-      desktopLog('media-active-failed', {
-        sessionId: desktopSession.id,
-      });
-      setConnectMode('failed');
-      setConnectMessage('Desktop media arrived, but the session state could not be confirmed.');
-    }
-  }
-
-  async function endDesktopSession() {
-    const sessionId = desktopSession?.id;
-    clearPeerDisconnectTimer();
-    peerRef.current?.close();
-    peerRef.current = null;
-    controlRef.current = null;
-    mediaActivatedRef.current = false;
-    setRemoteStream(null);
-    setConnectMode('disconnected');
-    setConnectMessage('Remote desktop session ended.');
-    if (sessionId) {
-      await fetch(remoteAccessApiUrl(`/api/remoteaccess/desktop/sessions/${encodeURIComponent(sessionId)}/end`), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }).catch(() => {});
-    }
-  }
-
-  function sendControl(type: string, payload: Record<string, unknown>) {
-    const channel = controlRef.current;
-    if (connectMode !== 'connected' || !desktopSession || !channel || channel.readyState !== 'open') return;
-    channel.send(JSON.stringify({ type, ...payload }));
-  }
-
-  function pointerPayload(event: React.MouseEvent<HTMLDivElement>, includeButton = false) {
-    const width = Math.max(1, event.currentTarget.clientWidth);
-    const height = Math.max(1, event.currentTarget.clientHeight);
-    return {
-      xRatio: event.nativeEvent.offsetX / width,
-      yRatio: event.nativeEvent.offsetY / height,
-      ...(includeButton ? { button: event.button } : {}),
-    };
+  function connect() {
+    window.open(`/remoteaccess/devices/${encodeURIComponent(id)}/desktop`, '_blank', 'noopener');
   }
 
   return (
@@ -637,25 +171,16 @@ export default function RemoteAccessDevicePage() {
             </section>
 
             <section style={panel}>
-              <h2 style={sectionTitle}>Remote Connection</h2>
-              <p style={muted}>{detail.remoteDesktop?.label || detail.remoteConnect?.label || 'Remote desktop is not available in this portal yet.'}</p>
-              {detail.remoteDesktop?.ice?.warning && <p style={warning}>{detail.remoteDesktop.ice.warning}</p>}
+              <h2 style={sectionTitle}>Remote Desktop</h2>
+              <p style={muted}>{detail.remoteDesktop?.label || detail.remoteConnect?.label || 'Remote desktop is not available.'}</p>
               <div style={capabilityGrid}>
-                <DetailItem label="Signaling" value={detail.remoteDesktop?.runtime?.webrtcSignaling || 'unavailable'} />
+                <DetailItem label="Relay" value={detail.remoteDesktop?.runtime?.relay || detail.remoteDesktop?.runtime?.webrtcSignaling || 'unavailable'} />
                 <DetailItem label="Screen capture" value={detail.remoteDesktop?.runtime?.screenCapture || 'not_ready'} />
                 <DetailItem label="Input" value={detail.remoteDesktop?.runtime?.input || 'not_ready'} />
               </div>
               {detail.remoteDesktop?.available ? (
-                <button
-                  type="button"
-                  onClick={connect}
-                  disabled={connectMode === 'connecting' || connectMode === 'signaling' || connectMode === 'waiting'}
-                  style={{
-                    ...button,
-                    ...(connectMode === 'connecting' || connectMode === 'signaling' || connectMode === 'waiting' ? disabledButton : {}),
-                  }}
-                >
-                  {connectMode === 'connecting' || connectMode === 'signaling' ? 'Connecting...' : 'Connect'}
+                <button type="button" onClick={connect} style={button}>
+                  Connect
                 </button>
               ) : (
                 <div style={statePill}>
@@ -666,47 +191,6 @@ export default function RemoteAccessDevicePage() {
                       : 'Remote desktop unavailable'}
                 </div>
               )}
-              {desktopSession && <button type="button" onClick={endDesktopSession} style={secondaryButton}>Disconnect</button>}
-              {connectMode !== 'idle' && (
-                <p style={connectStatus(connectMode)}>{connectMessage}</p>
-              )}
-              <div
-                style={viewer}
-                tabIndex={0}
-                onMouseMove={(event) => sendControl('mouse_move', pointerPayload(event))}
-                onMouseDown={(event) => sendControl('mouse_down', pointerPayload(event, true))}
-                onMouseUp={(event) => sendControl('mouse_up', pointerPayload(event, true))}
-                onKeyDown={(event) => sendControl('key_down', { key: event.key, code: event.code })}
-                onKeyUp={(event) => sendControl('key_up', { key: event.key, code: event.code })}
-              >
-                {remoteStream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={video}
-                    onLoadedData={() => {
-                      desktopLog('video-loadeddata');
-                      void markMediaActive();
-                    }}
-                    onPlaying={() => {
-                      desktopLog('video-playing');
-                      void markMediaActive();
-                    }}
-                    onError={() => desktopLog('video-error', {
-                      errorCode: videoRef.current?.error?.code || null,
-                      errorMessage: videoRef.current?.error?.message || null,
-                    })}
-                  />
-                ) : (
-                  <div style={viewerEmpty}>
-                    {connectMode === 'connected'
-                      ? 'Waiting for desktop media confirmation.'
-                      : 'Remote desktop video will appear here when the agent capture runtime is ready.'}
-                  </div>
-                )}
-              </div>
               {detail.recentRemoteDesktopSessions?.length ? (
                 <div style={sessionList}>
                   {detail.recentRemoteDesktopSessions.map((session) => (
@@ -828,30 +312,14 @@ const buttonLink: React.CSSProperties = {
 
 const button: React.CSSProperties = {
   display: 'inline-block',
-  padding: '10px 14px',
+  padding: '10px 22px',
   border: '1px solid #2563eb',
   borderRadius: '6px',
   background: '#2563eb',
   color: '#fff',
   fontWeight: 700,
   cursor: 'pointer',
-};
-
-const secondaryButton: React.CSSProperties = {
-  display: 'inline-block',
-  marginLeft: '8px',
-  padding: '10px 14px',
-  border: '1px solid #64748b',
-  borderRadius: '6px',
-  background: '#fff',
-  color: '#334155',
-  fontWeight: 700,
-  cursor: 'pointer',
-};
-
-const disabledButton: React.CSSProperties = {
-  opacity: 0.7,
-  cursor: 'wait',
+  fontSize: '15px',
 };
 
 const statePill: React.CSSProperties = {
@@ -877,33 +345,6 @@ const capabilityGrid: React.CSSProperties = {
   marginBottom: '14px',
 };
 
-const viewer: React.CSSProperties = {
-  marginTop: '14px',
-  width: '100%',
-  aspectRatio: '16 / 9',
-  border: '1px solid #1f2937',
-  borderRadius: '6px',
-  background: '#0f172a',
-  color: '#cbd5e1',
-  display: 'grid',
-  placeItems: 'center',
-  overflow: 'hidden',
-  outline: 'none',
-};
-
-const viewerEmpty: React.CSSProperties = {
-  padding: '18px',
-  textAlign: 'center',
-  fontSize: '14px',
-};
-
-const video: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'contain',
-  background: '#000',
-};
-
 const sessionList: React.CSSProperties = {
   marginTop: '12px',
   display: 'grid',
@@ -917,22 +358,6 @@ const sessionRow: React.CSSProperties = {
   color: '#475569',
   fontSize: '13px',
 };
-
-function connectStatus(state: ConnectMode): React.CSSProperties {
-  const color = state === 'connected'
-    ? '#166534'
-    : state === 'unavailable' || state === 'expired' || state === 'waiting'
-      ? '#92400e'
-      : state === 'failed'
-        ? '#991b1b'
-        : '#334155';
-
-  return {
-    marginBottom: 0,
-    color,
-    fontSize: '14px',
-  };
-}
 
 const statusRow: React.CSSProperties = {
   display: 'flex',

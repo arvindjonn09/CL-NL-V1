@@ -22,29 +22,22 @@ func CurrentCapability() Capability {
 		WebRTC:        "not_ready",
 		ScreenCapture: "not_ready",
 		Input:         "not_ready",
-		Reason:        "agent remote desktop WebRTC runtime is not implemented yet",
+		Reason:        "agent remote desktop relay runtime is not implemented on this platform yet",
 		Platform:      runtime.GOOS,
 		FfmpegSource:  "unsupported",
 	}
 
 	if runtime.GOOS == "windows" {
 		capability.Supported = true
-		ffmpeg, err := ResolveFFmpeg()
-		capability.FfmpegPath = ffmpeg.Path
-		capability.FfmpegSource = ffmpeg.Source
-		if err != nil {
-			capability.WebRTC = "ready"
-			capability.Reason = err.Error()
-			return capability
-		}
-		capability.WebRTC = "ready"
+		capability.WebRTC = "relay"
+		capability.FfmpegSource = ""
 		capability.Input = "ready"
 		captureEnvironment := CurrentCaptureEnvironment()
 		capability.CaptureEnvironment = &captureEnvironment
 		capability.ScreenCapture = captureEnvironment.State
 		if captureEnvironment.CaptureAvailable {
 			capability.State = "ready"
-			capability.Reason = "Windows ffmpeg gdigrab capture and WebRTC runtime ready"
+			capability.Reason = "Windows native JPEG capture and WebSocket relay runtime ready"
 		} else {
 			capability.State = "not_ready"
 			capability.Reason = captureEnvironment.Reason

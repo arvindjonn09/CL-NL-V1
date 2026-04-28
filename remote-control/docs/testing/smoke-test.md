@@ -17,7 +17,7 @@ Use this as a repeatable smoke test before release or after installer, agent, re
 
 ```powershell
 cd installer\SetuLinkSetup
-.\dist\SetuLinkSetup.exe /BACKENDURL="https://setuapi.shivomsangha.com"
+.\dist\SetuLinkSetup.exe /BACKENDURL="https://netraapi.shivomsangha.com"
 ```
 
 Expected result: installation completes.
@@ -135,4 +135,3 @@ Expected result: first, second, and third failures restart the service; reset pe
 Expected result: Windows service recovery restarts `SetuLinkAgent`.
 
 If this fails: rerun installer repair and verify recovery policy again.
-

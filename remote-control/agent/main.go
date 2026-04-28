@@ -21,6 +21,14 @@ type agentOptions struct {
 }
 
 func main() {
+	if handled, err := maybeRunHelperMode(os.Args[1:]); handled {
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if runWindowsServiceIfNeeded() {
 		return
 	}
@@ -110,12 +118,10 @@ func runAgent(ctx context.Context, runMode string) error {
 	heartbeatTicker := time.NewTicker(30 * time.Second)
 	commandTicker := time.NewTicker(5 * time.Second)
 	actionTicker := time.NewTicker(5 * time.Second)
-	remoteDesktopTicker := time.NewTicker(5 * time.Second)
 	watchdogTicker := time.NewTicker(30 * time.Second)
 	defer heartbeatTicker.Stop()
 	defer commandTicker.Stop()
 	defer actionTicker.Stop()
-	defer remoteDesktopTicker.Stop()
 	defer watchdogTicker.Stop()
 
 	for {
@@ -191,10 +197,6 @@ func runAgent(ctx context.Context, runMode string) error {
 				logger("actions").Info("received", "action received", logMetadata("actionId", action.ID, "actionType", action.ActionType))
 				ProcessAction(cfg, *action)
 			}
-
-		case <-remoteDesktopTicker.C:
-			recordWatchdogLoop("remote-desktop-worker")
-			ProcessRemoteDesktopPending(cfg)
 
 		case <-watchdogTicker.C:
 			recordWatchdogLoop("main")

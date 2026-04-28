@@ -197,7 +197,7 @@ export default function RemoteAccessPage() {
       <section style={shell}>
         <header style={header}>
           <div>
-            <h1 style={title}>SetuLink Remote Access</h1>
+            <h1 style={title}>NetraLink Remote Access</h1>
             <p style={subtitle}>Read-only device status and remote-access visibility for authorized users.</p>
           </div>
           {mode === 'dashboard' && (

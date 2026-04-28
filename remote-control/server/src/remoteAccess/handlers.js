@@ -59,7 +59,6 @@ function registerRemoteAccessRoutes(app, {
   userStore,
   agentAuthMiddleware = null,
   getConnectedAgent = null,
-  pushRemoteDesktopPending = null,
 } = {}) {
   const remoteAuth = (req, res, next) => remoteAccessMiddleware(pool, userStore, req, res, next);
   const isAgentReachable = (deviceId) => {
@@ -334,10 +333,6 @@ function registerRemoteAccessRoutes(app, {
         remoteUserIdentity: req.remoteUser.email,
         deviceId,
       });
-
-      if (typeof pushRemoteDesktopPending === 'function') {
-        pushRemoteDesktopPending(deviceId, desktopSession.id);
-      }
 
       await auditRemoteSession(pool, req, {
         action: 'remote_desktop_granted',

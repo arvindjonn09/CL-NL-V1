@@ -50,3 +50,24 @@ func TestCopyDirectoryContentsCopiesNestedFFmpegFiles(t *testing.T) {
 		t.Fatalf("unexpected nested copy data=%q err=%v", string(data), err)
 	}
 }
+
+func TestValidateInstallModePathsRequiresProgramFilesServiceBinary(t *testing.T) {
+	ctx := &InstallerContext{
+		Options: &InstallerOptions{},
+		Paths: InstallPaths{
+			InstallDir:      defaultInstallDir(),
+			ProgramDataDir:  defaultProgramDataDir(),
+			AgentBinaryDest: joinPath(defaultInstallDir(), "setulink-agent.exe"),
+			ConfigPath:      joinPath(defaultProgramDataDir(), "config", "agent.json"),
+		},
+	}
+
+	if err := validateInstallModePaths(ctx); err != nil {
+		t.Fatalf("validateInstallModePaths() error = %v", err)
+	}
+
+	ctx.Paths.AgentBinaryDest = joinPath(defaultProgramDataDir(), "setulink-agent.exe")
+	if err := validateInstallModePaths(ctx); err == nil {
+		t.Fatalf("validateInstallModePaths() error = nil, want binary path validation error")
+	}
+}

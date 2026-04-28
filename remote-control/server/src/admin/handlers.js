@@ -11,8 +11,8 @@ const {
 } = require('../access/users');
 const { sendPasswordResetConfirmationEmail } = require('../email');
 
-const BACKEND_PUBLIC = process.env.ADMIN_BACKEND_PUBLIC_URL || 'https://setuapi.shivomsangha.com/api/health';
-const FRONTEND_PUBLIC = process.env.ADMIN_FRONTEND_PUBLIC_URL || 'https://setulink.shivomsangha.com';
+const BACKEND_PUBLIC = process.env.ADMIN_BACKEND_PUBLIC_URL || 'https://netraapi.shivomsangha.com/api/health';
+const FRONTEND_PUBLIC = process.env.ADMIN_FRONTEND_PUBLIC_URL || 'https://netralink.shivomsangha.com';
 const FRONTEND_LOCAL = process.env.ADMIN_FRONTEND_LOCAL_URL || 'http://localhost:3201';
 
 async function checkUrl(url, expected = '', timeoutMs = 5000) {

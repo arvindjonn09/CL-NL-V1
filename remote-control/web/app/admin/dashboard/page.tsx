@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
       <div style={header}>
         <div>
           <h1 style={{ margin: 0 }}>Admin Dashboard</h1>
-          <p style={muted}>Operational overview for SetuLink administrators.</p>
+          <p style={muted}>Operational overview for NetraLink administrators.</p>
         </div>
         <AdminNav />
       </div>

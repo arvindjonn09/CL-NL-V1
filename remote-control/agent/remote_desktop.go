@@ -64,6 +64,7 @@ type RemoteDesktopIceRequest struct {
 
 type activeRemoteDesktopRuntime struct {
 	cancel context.CancelFunc
+	pipe   desktopPipeConn
 }
 
 var remoteDesktopRuntimes = struct {

@@ -13,8 +13,8 @@ ROUTER_PORT="${ROUTER_PORT:-3001}"
 TIMEOUT="${TIMEOUT:-60}"
 INSTALL_DEPS="${INSTALL_DEPS:-auto}"
 
-PUBLIC_API_ORIGIN="${PUBLIC_API_ORIGIN:-https://setuapi.shivomsangha.com}"
-PUBLIC_FRONTEND_ORIGIN="${PUBLIC_FRONTEND_ORIGIN:-https://setulink.shivomsangha.com}"
+PUBLIC_API_ORIGIN="${PUBLIC_API_ORIGIN:-https://netraapi.shivomsangha.com}"
+PUBLIC_FRONTEND_ORIGIN="${PUBLIC_FRONTEND_ORIGIN:-https://netralink.shivomsangha.com}"
 
 BACKEND_LOCAL_STATUS="FAIL"
 FRONTEND_LOCAL_STATUS="FAIL"
@@ -540,14 +540,14 @@ configure_checks() {
     "FRONTEND_LOCAL|Frontend local|${FRONTEND_LOCAL_ORIGIN}|<html"
     "ROUTER_LOCAL|Origin router local|${ROUTER_LOCAL_ORIGIN}|<html"
     "ADMIN_LOCAL|Admin login local|${FRONTEND_LOCAL_ORIGIN}/admin|Admin Login"
-    "REMOTEACCESS_LOCAL|RemoteAccess local|${FRONTEND_LOCAL_ORIGIN}/remoteaccess|SetuLink Remote Access"
+    "REMOTEACCESS_LOCAL|RemoteAccess local|${FRONTEND_LOCAL_ORIGIN}/remoteaccess|NetraLink Remote Access"
   )
 
   PUBLIC_CHECKS=(
     "BACKEND_PUBLIC|Backend public|${BACKEND_PUBLIC_HEALTH}|\"ok\":true"
     "FRONTEND_PUBLIC|Frontend public|${PUBLIC_FRONTEND_ORIGIN}|SetuLink"
     "ADMIN_PUBLIC|Admin login public|${PUBLIC_FRONTEND_ORIGIN}/admin|Admin Login"
-    "REMOTEACCESS_PUBLIC|RemoteAccess public|${PUBLIC_FRONTEND_ORIGIN}/remoteaccess|SetuLink Remote Access"
+    "REMOTEACCESS_PUBLIC|RemoteAccess public|${PUBLIC_FRONTEND_ORIGIN}/remoteaccess|NetraLink Remote Access"
   )
 
   if [[ -f "$WEB_DIR/app/docs/runbook/[slug]/route.ts" ]]; then
@@ -600,8 +600,8 @@ config_presence_status() {
 }
 
 detect_webrtc_env() {
-  step "Remote-desktop WebRTC environment"
-  echo "Checking exported environment and server/.env presence only; secret values are not printed."
+  step "Remote-desktop relay environment"
+  echo "Remote desktop now uses the authenticated WebSocket relay path; TURN/STUN settings are legacy and not required for screen relay."
 
   STUN_STATUS="$(config_presence_status WEBRTC_STUN_URLS)"
   TURN_URLS_STATUS="$(config_presence_status WEBRTC_TURN_URLS)"
@@ -614,14 +614,11 @@ detect_webrtc_env() {
     TURN_STATUS="MISSING"
   fi
 
-  echo "WEBRTC_STUN_URLS: $STUN_STATUS"
-  echo "WEBRTC_TURN_URLS: $TURN_URLS_STATUS"
-  echo "WEBRTC_TURN_USERNAME: $TURN_USERNAME_STATUS"
-  echo "WEBRTC_TURN_CREDENTIAL: $TURN_CREDENTIAL_STATUS"
-
-  if [[ "$TURN_STATUS" != "CONFIGURED" ]]; then
-    echo "WARNING: TURN not configured: same-LAN or simple NAT tests may work, but reliable unattended WAN remote desktop will not be dependable."
-  fi
+  echo "WEBSOCKET_RELAY: ENABLED"
+  echo "WEBRTC_STUN_URLS: $STUN_STATUS (legacy)"
+  echo "WEBRTC_TURN_URLS: $TURN_URLS_STATUS (legacy)"
+  echo "WEBRTC_TURN_USERNAME: $TURN_USERNAME_STATUS (legacy)"
+  echo "WEBRTC_TURN_CREDENTIAL: $TURN_CREDENTIAL_STATUS (legacy)"
 
   record_summary "WEBRTC_STUN_URLS" "$STUN_STATUS" "presence only"
   record_summary "WEBRTC_TURN_URLS" "$TURN_URLS_STATUS" "presence only"
@@ -631,11 +628,12 @@ detect_webrtc_env() {
 
 print_remote_desktop_notes() {
   step "Remote-desktop readiness notes"
-  echo "Remote desktop signaling foundation deployed when backend/web checks pass."
+  echo "Remote desktop relay is deployed when backend/web checks pass."
   echo "Real live desktop on Windows agents still depends on:"
-  echo "  - bundled ffmpeg under the Windows install directory, or system ffmpeg as fallback"
+  echo "  - updated agent binary with helper mode installed"
+  echo "  - helper launch into the active Windows user session"
   echo "  - interactive desktop/session capture being available"
-  echo "  - TURN configuration for reliable WAN/NAT traversal if needed"
+  echo "TURN/STUN and ffmpeg are legacy WebRTC capture checks and are not required for the WebSocket JPEG relay."
   echo "This deploy verifies server/web routes only; it does not prove unattended live Windows desktop capture is fully ready."
 }
 
@@ -716,15 +714,12 @@ print_summary() {
   printf "\n--- Remote Desktop Readiness ---\n"
   printf "STUN: %s\n" "$STUN_STATUS"
   printf "TURN: %s\n" "$TURN_STATUS"
-  printf "REMOTE DESKTOP: signaling foundation deployed; Windows live desktop runtime readiness still depends on bundled/system ffmpeg, interactive capture, and TURN when WAN/NAT requires it.\n"
+  printf "REMOTE DESKTOP: WebSocket JPEG relay deployed; Windows live desktop runtime readiness depends on the updated agent helper running in the active user session.\n"
 
   if [[ "$local_failed" -eq 0 && "$public_failed" -ne 0 ]]; then
     printf "\nLocal deployment succeeded, but public/Cloudflare reachability failed.\n"
   fi
 
-  if [[ "$TURN_STATUS" != "CONFIGURED" ]]; then
-    printf "\nTURN not configured: same-LAN or simple NAT tests may work, but reliable unattended WAN remote desktop will not be dependable.\n"
-  fi
 
   printf "\n--- Details ---\n"
   for row in "${SUMMARY_ROWS[@]}"; do

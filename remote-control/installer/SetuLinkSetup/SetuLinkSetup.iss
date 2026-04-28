@@ -9,7 +9,7 @@
 #define FfmpegAssets "assets\ffmpeg\*"
 #define ConfigTemplate "config.template.json"
 #ifndef DefaultBackendUrl
-#define DefaultBackendUrl "https://setuapi.shivomsangha.com"
+#define DefaultBackendUrl "https://netraapi.shivomsangha.com"
 #endif
 
 [Setup]
@@ -87,7 +87,7 @@ begin
   LowerValue := Lowercase(Trim(Value));
   Result :=
     (LowerValue = '') or
-    (Pos('://setulink.shivomsangha.com', LowerValue) > 0) or
+    (Pos('://netralink.shivomsangha.com', LowerValue) > 0) or
     ((Pos('https://', LowerValue) <> 1) and (Pos('http://', LowerValue) <> 1));
 end;
 
@@ -123,7 +123,7 @@ begin
     if IsBadBackendUrl(BackendPage.Values[0]) then
     begin
       MsgBox(
-        'Backend URL must point to the API host, e.g. https://setuapi.shivomsangha.com',
+        'Backend URL must point to the API host, e.g. https://netraapi.shivomsangha.com',
         mbError,
         MB_OK
       );

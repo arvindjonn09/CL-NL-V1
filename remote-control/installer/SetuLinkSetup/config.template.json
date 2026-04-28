@@ -1,6 +1,6 @@
 {
-  "backendUrl": "https://setuapi.shivomsangha.com",
-  "serverUrl": "https://setuapi.shivomsangha.com",
+  "backendUrl": "https://netraapi.shivomsangha.com",
+  "serverUrl": "https://netraapi.shivomsangha.com",
   "agentToken": "setulink-dev-agent-secret",
   "environmentLabel": "unknown",
   "deviceId": "",

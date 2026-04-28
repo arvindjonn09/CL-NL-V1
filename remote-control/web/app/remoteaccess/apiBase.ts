@@ -1,5 +1,5 @@
-const PUBLIC_FRONTEND_HOST = 'setulink.shivomsangha.com';
-const PUBLIC_API_BASE = 'https://setuapi.shivomsangha.com';
+const PUBLIC_FRONTEND_HOST = 'netralink.shivomsangha.com';
+const PUBLIC_API_BASE = 'https://netraapi.shivomsangha.com';
 const BACKEND_PORT = '3000';
 
 export const REMOTE_ACCESS_SESSION_TIMEOUT_MS = 2500;
@@ -43,4 +43,10 @@ export function remoteAccessApiBaseUrl(location: LocationLike = window.location)
 export function remoteAccessApiUrl(path: string, location?: LocationLike) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${remoteAccessApiBaseUrl(location)}${normalizedPath}`;
+}
+
+export function remoteAccessWsUrl(path: string, location: LocationLike = window.location) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const base = remoteAccessApiBaseUrl(location);
+  return `${base.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')}${normalizedPath}`;
 }

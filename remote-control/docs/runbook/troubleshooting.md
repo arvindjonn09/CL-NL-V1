@@ -56,7 +56,7 @@ sc.exe start SetuLinkAgent
 2. Check backend connectivity:
 
 ```powershell
-Invoke-RestMethod "https://setuapi.shivomsangha.com/health"
+Invoke-RestMethod "https://netraapi.shivomsangha.com/health"
 ```
 
 Expected result: backend health responds.
@@ -140,4 +140,3 @@ If this fails: check backend request errors, action result post errors, and watc
 Expected result: file jobs are downloaded into the configured files directory and completion is posted.
 
 If this fails: inspect download errors, file write errors, and file complete/failed status post errors.
-

@@ -6,7 +6,7 @@ Before any update, deploy, restart, or routing change, check the current origin 
 
 - `3000`: backend API for `https://netraapi.shivomsangha.com` — Cloudflare tunnel hard-lock
 - `3001`: origin router for `https://netralink.shivomsangha.com` — Cloudflare tunnel hard-lock
-- `3201`: SetuLink / Netra frontend behind the origin router
+- `3201`: NetraLink frontend behind the origin router
 - `3478`: TURN/STUN server for `https://netraturn.shivomsangha.com` — **CLOUDFLARE TUNNEL HARD-LOCK** (see section below)
 
 The Cloudflare tunnel routes frontend traffic to the origin router on port `3001`. The origin router (`scripts/origin-router.js`) forwards the `netralink.shivomsangha.com` host to the frontend on port `3201`.
@@ -36,7 +36,7 @@ Expected:
 
 > **DO NOT PROCEED.**
 >
-> Port `3478` is the standard TURN/STUN protocol port and is permanently registered in the Cloudflare tunnel configuration for `turn.shivomsangha.com`. Cloudflare routes external UDP/TCP traffic for WebRTC peer connections directly to `localhost:3478`. Changing this port will:
+> Port `3478` is the standard TURN/STUN protocol port and is permanently registered in the Cloudflare tunnel configuration for `netraturn.shivomsangha.com`. Cloudflare routes external UDP/TCP traffic for WebRTC peer connections directly to `localhost:3478`. Changing this port will:
 >
 > - Immediately break all WebRTC connections relayed through this server
 > - Require a Cloudflare tunnel reconfiguration (external action, not a code change)

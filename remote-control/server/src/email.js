@@ -33,7 +33,7 @@ function emailFromAddress() {
   if (fromEmail && fromName) return `${fromName} <${fromEmail}>`;
   if (fromEmail) return fromEmail;
 
-  return 'SetuLink <no-reply@setulink.local>';
+  return 'NetraLink <no-reply@netralink.local>';
 }
 
 function smtpConfig() {
@@ -58,15 +58,15 @@ function smtpConfig() {
 function verificationEmail({ email, code, expiresMinutes }) {
   return {
     to: email,
-    subject: 'Your SetuLink remote access code',
+    subject: 'Your NetraLink remote access code',
     text: [
-      `Your SetuLink remote access verification code is ${code}.`,
+      `Your NetraLink remote access verification code is ${code}.`,
       '',
       `This code expires in ${expiresMinutes} minutes.`,
       'If you did not request this code, ignore this email.',
     ].join('\n'),
     html: [
-      '<p>Your SetuLink remote access verification code is:</p>',
+      '<p>Your NetraLink remote access verification code is:</p>',
       `<p style="font-size: 24px; font-weight: 700; letter-spacing: 4px;">${code}</p>`,
       `<p>This code expires in ${expiresMinutes} minutes.</p>`,
       '<p>If you did not request this code, ignore this email.</p>',
@@ -79,19 +79,19 @@ function passwordResetEmail({ email, displayName, resetBy }) {
   const adminLine = resetBy ? ` by ${resetBy}` : '';
   return {
     to: email,
-    subject: 'Your SetuLink password was reset',
+    subject: 'Your NetraLink password was reset',
     text: [
       `Hi ${name},`,
       '',
-      `Your SetuLink account password was reset${adminLine}.`,
-      'Your existing SetuLink sessions were revoked, so please sign in again with the new password provided by your administrator.',
+      `Your NetraLink account password was reset${adminLine}.`,
+      'Your existing NetraLink sessions were revoked, so please sign in again with the new password provided by your administrator.',
       '',
       'If you did not expect this reset, contact your administrator immediately.',
     ].join('\n'),
     html: [
       `<p>Hi ${name},</p>`,
-      `<p>Your SetuLink account password was reset${adminLine}.</p>`,
-      '<p>Your existing SetuLink sessions were revoked, so please sign in again with the new password provided by your administrator.</p>',
+      `<p>Your NetraLink account password was reset${adminLine}.</p>`,
+      '<p>Your existing NetraLink sessions were revoked, so please sign in again with the new password provided by your administrator.</p>',
       '<p>If you did not expect this reset, contact your administrator immediately.</p>',
     ].join(''),
   };

@@ -46,7 +46,6 @@ const {
   initWebSocket,
   getConnectedAgent,
   broadcastToBrowsers,
-  pushRemoteDesktopPending,
 } = require('./wsServer');
 
 const app = express();
@@ -69,7 +68,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-initWebSocket(server);
 const accessUserStore = createAccessUserStore(pool);
 const remoteUserStore = {
   async getUser(identity) {
@@ -82,6 +80,7 @@ const remoteUserStore = {
     return accessUserStore.verifyCredentials(identity, password);
   },
 };
+initWebSocket(server, { pool, userStore: remoteUserStore });
 
 if (trustProxy) {
   app.set('trust proxy', 1);
@@ -780,7 +779,6 @@ registerRemoteAccessRoutes(app, {
   userStore: remoteUserStore,
   agentAuthMiddleware,
   getConnectedAgent,
-  pushRemoteDesktopPending,
 });
 registerRemoteDesktopRoutes(app, {
   pool,

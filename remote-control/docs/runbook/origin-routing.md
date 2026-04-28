@@ -6,7 +6,7 @@ The public frontend hostnames share the same Cloudflare/local origin entrypoint.
 
 - `3000`: backend API — Cloudflare tunnel `netraapi.shivomsangha.com` → `http://127.0.0.1:3000`
 - `3001`: origin router — Cloudflare tunnel `netralink.shivomsangha.com` → `http://127.0.0.1:3001`
-- `3201`: SetuLink Next.js frontend behind the origin router
+- `3201`: NetraLink Next.js frontend behind the origin router
 - `3478`: TURN server — Cloudflare tunnel `netraturn.shivomsangha.com` → `http://127.0.0.1:3478`
 
 The origin router (`scripts/origin-router.js`) is the public entrypoint for the frontend. It forwards `netralink.shivomsangha.com` requests from port `3001` to the Next.js app on port `3201`.

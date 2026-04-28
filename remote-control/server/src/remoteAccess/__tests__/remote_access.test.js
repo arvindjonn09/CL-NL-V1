@@ -136,7 +136,7 @@ function createRemoteDataPool() {
         state: 'ready',
         screenCapture: 'ready',
         input: 'ready',
-        reason: 'Windows ffmpeg gdigrab capture and WebRTC runtime ready',
+        reason: 'Windows native JPEG capture and WebSocket relay runtime ready',
       },
     },
     {

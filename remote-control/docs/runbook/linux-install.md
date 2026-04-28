@@ -31,20 +31,20 @@ agent/setulink-agent
 Run from the repo root:
 
 ```bash
-sudo BACKEND_URL="https://setuapi.shivomsangha.com" ./scripts/install-setulink-ubuntu.sh
+sudo BACKEND_URL="https://netraapi.shivomsangha.com" ./scripts/install-setulink-ubuntu.sh
 ```
 
 Run from the `scripts` directory:
 
 ```bash
 cd scripts
-sudo BACKEND_URL="https://setuapi.shivomsangha.com" ./install-setulink-ubuntu.sh
+sudo BACKEND_URL="https://netraapi.shivomsangha.com" ./install-setulink-ubuntu.sh
 ```
 
 Run with an explicit agent binary:
 
 ```bash
-sudo BACKEND_URL="https://setuapi.shivomsangha.com" ./scripts/install-setulink-ubuntu.sh /tmp/setulink-agent
+sudo BACKEND_URL="https://netraapi.shivomsangha.com" ./scripts/install-setulink-ubuntu.sh /tmp/setulink-agent
 ```
 
 The script installs:

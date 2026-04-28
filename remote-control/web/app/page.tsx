@@ -4,10 +4,10 @@ export default function Home() {
   return (
     <main style={page}>
       <section style={hero}>
-        <p style={eyebrow}>SetuLink</p>
+        <p style={eyebrow}>NetraLink</p>
         <h1 style={title}>Remote device operations with clear health, access, and recovery paths.</h1>
         <p style={copy}>
-          SetuLink helps teams monitor connected agents, understand device health, review operational history,
+          NetraLink helps teams monitor connected agents, understand device health, review operational history,
           and separate admin controls from restricted remote-user access.
         </p>
         <div style={actions}>

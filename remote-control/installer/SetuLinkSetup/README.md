@@ -28,13 +28,13 @@ From this folder:
 The default backend API URL is:
 
 ```text
-https://setuapi.shivomsangha.com
+https://netraapi.shivomsangha.com
 ```
 
 To override the baked backend URL for another environment:
 
 ```powershell
-.\build.ps1 -Clean -DefaultBackendURL "https://setuapi.shivomsangha.com" -Version "0.1.0"
+.\build.ps1 -Clean -DefaultBackendURL "https://netraapi.shivomsangha.com" -Version "0.1.0"
 ```
 
 `build.ps1` is the single clean build entrypoint. It always:
@@ -81,13 +81,13 @@ Run the final installer as administrator:
 To override the backend URL at install time:
 
 ```powershell
-.\dist\SetuLinkSetup.exe /BACKENDURL="https://setuapi.shivomsangha.com"
+.\dist\SetuLinkSetup.exe /BACKENDURL="https://netraapi.shivomsangha.com"
 ```
 
 The backend URL must point to the API host. The installer rejects obvious frontend-host misuse such as:
 
 ```text
-https://setulink.shivomsangha.com
+https://netralink.shivomsangha.com
 ```
 
 The bootstrap also performs a lightweight health probe against:
@@ -171,7 +171,7 @@ The Windows service wrapper writes fatal startup errors and panics to `agent.log
 Example structured log shape:
 
 ```json
-{"component":"runtime","action":"remote-desktop-capability","message":"remote desktop capability summary","metadata":{"remoteDesktopCapabilityState":"ready","ffmpegPath":"C:\\Program Files\\SetuLink\\ffmpeg\\ffmpeg.exe","ffmpegSource":"bundled","reason":"Windows ffmpeg gdigrab capture and WebRTC runtime ready"}}
+{"component":"runtime","action":"remote-desktop-capability","message":"remote desktop capability summary","metadata":{"remoteDesktopCapabilityState":"ready","ffmpegPath":"C:\\Program Files\\SetuLink\\ffmpeg\\ffmpeg.exe","ffmpegSource":"bundled","reason":"Windows JPEG capture and websocket relay runtime ready"}}
 ```
 
 ## Fresh Windows Test Flow
@@ -195,13 +195,13 @@ Get-Content "C:\ProgramData\SetuLink\config\agent.json"
 Get-Content "C:\ProgramData\SetuLink\logs\installer.log" -Tail 120
 Get-Content "C:\ProgramData\SetuLink\logs\agent.log" -Tail 200
 Select-String -Path "C:\ProgramData\SetuLink\logs\agent.log" -Pattern "ffmpeg|remote-desktop|capability|desktop"
-Invoke-RestMethod "https://setuapi.shivomsangha.com/health"
+Invoke-RestMethod "https://netraapi.shivomsangha.com/health"
 ```
 
 Reinstall:
 
 ```powershell
-.\dist\SetuLinkSetup.exe /BACKENDURL="https://setuapi.shivomsangha.com"
+.\dist\SetuLinkSetup.exe /BACKENDURL="https://netraapi.shivomsangha.com"
 Get-Content "C:\ProgramData\SetuLink\logs\installer.log" -Tail 160
 Get-Content "C:\ProgramData\SetuLink\logs\agent.log" -Tail 160
 sc.exe query SetuLinkAgent

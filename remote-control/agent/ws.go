@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sync"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ type WSCommand struct {
 	ActionType string `json:"actionType"`
 	DeviceID   string `json:"deviceId"`
 	SessionID  string `json:"sessionId"`
+	Payload    json.RawMessage `json:"payload"`
 }
 
 func StartWebSocket(cfg *Config) {
@@ -45,6 +48,19 @@ func connectAndListen(cfg *Config) error {
 		return fmt.Errorf("dial error: %w", err)
 	}
 	defer conn.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var writeMu sync.Mutex
+	writeJSON := func(value any) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return conn.WriteJSON(value)
+	}
+	writeBinary := func(value []byte) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return conn.WriteMessage(websocket.BinaryMessage, value)
+	}
 
 	logger("websocket").Info("connected", "websocket connected", nil)
 
@@ -54,7 +70,7 @@ func connectAndListen(cfg *Config) error {
 		"agentToken": cfg.AgentToken,
 	}
 
-	if err := conn.WriteJSON(registerMsg); err != nil {
+	if err := writeJSON(registerMsg); err != nil {
 		return fmt.Errorf("register send failed: %w", err)
 	}
 
@@ -80,8 +96,26 @@ func connectAndListen(cfg *Config) error {
 		}
 
 		if cmd.Type == "remote-desktop-pending" {
-			logger("websocket").Info("remote-desktop-push", "remote desktop pending session received via websocket", logMetadata("sessionId", cmd.SessionID))
-			go ProcessRemoteDesktopPending(cfg)
+			logger("websocket").Info("remote-desktop-push-ignored", "legacy remote desktop pending push ignored; websocket relay waits for remote-desktop-start", logMetadata("sessionId", cmd.SessionID))
+			continue
+		}
+
+		if cmd.Type == "remote-desktop-start" {
+			logger("websocket").Info("remote-desktop-relay-start", "remote desktop websocket relay requested", logMetadata("sessionId", cmd.SessionID))
+			go StartRemoteDesktopRelay(ctx, cfg, cmd.SessionID, writeJSON, writeBinary)
+			continue
+		}
+
+		if cmd.Type == "remote-desktop-stop" {
+			logger("websocket").Info("remote-desktop-relay-stop", "remote desktop websocket relay stop requested", logMetadata("sessionId", cmd.SessionID))
+			cancelActiveRemoteDesktopRuntime(cmd.SessionID)
+			continue
+		}
+
+		if cmd.Type == "remote-desktop-control" {
+			if err := ProcessRemoteDesktopRelayControl(cmd.SessionID, cmd.Payload); err != nil {
+				logger("remote-desktop").Warn("relay-control", "remote desktop relay input failed", err, logMetadata("sessionId", cmd.SessionID))
+			}
 			continue
 		}
 
@@ -99,7 +133,7 @@ func connectAndListen(cfg *Config) error {
 
 			started := time.Now()
 			output, err := ExecuteCommandStreaming(cmd.Command, func(chunk string) {
-				_ = conn.WriteJSON(map[string]interface{}{
+				_ = writeJSON(map[string]interface{}{
 					"type":      "output",
 					"commandId": cmd.CommandID,
 					"chunk":     chunk,

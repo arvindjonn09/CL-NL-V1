@@ -90,8 +90,8 @@ const (
 	serviceDescription         = "Runs the SetuLink remote-control agent in the background."
 	serviceRestartDelayMs      = 60000
 	serviceFailureResetSeconds = 86400
-	publicAPIExample           = "https://setuapi.shivomsangha.com"
-	frontendHost               = "setulink.shivomsangha.com"
+	publicAPIExample           = "https://netraapi.shivomsangha.com"
+	frontendHost               = "netralink.shivomsangha.com"
 )
 
 func newInstallerContext(opts *InstallerOptions) (*InstallerContext, error) {

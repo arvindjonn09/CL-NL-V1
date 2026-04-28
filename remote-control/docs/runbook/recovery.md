@@ -80,7 +80,7 @@ First actions:
 sc.exe query SetuLinkAgent
 Get-Content "C:\ProgramData\SetuLink\logs\agent.log" -Tail 200
 Get-Content "C:\ProgramData\SetuLink\logs\installer.log" -Tail 120
-Invoke-RestMethod "https://setuapi.shivomsangha.com/health"
+Invoke-RestMethod "https://netraapi.shivomsangha.com/health"
 ```
 
 ## Windows Service Recovery Policy
@@ -104,4 +104,3 @@ sc.exe qfailureflag SetuLinkAgent
 Expected result: restart actions are present with a one-day reset period.
 
 If this fails: rerun the installer or repair install. Do not rely on manual recovery settings as the source of truth.
-

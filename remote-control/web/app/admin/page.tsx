@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
   return (
     <main style={page}>
       <section style={panel}>
-        <p style={eyebrow}>SetuLink Admin</p>
+        <p style={eyebrow}>NetraLink Admin</p>
         <h1 style={title}>Admin Login</h1>
         <p style={copy}>Sign in to manage devices, users, health, and operational controls.</p>
 

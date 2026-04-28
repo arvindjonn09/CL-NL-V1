@@ -50,18 +50,6 @@ function desktopCapabilityForDevice(device, options = {}) {
     };
   }
 
-  const ice = publicIceConfig();
-  if (!ice.usable) {
-    return {
-      supported: true,
-      available: false,
-      state: 'not_ready',
-      reason: 'ice-config-missing',
-      label: 'Remote desktop not ready',
-      ice,
-    };
-  }
-
   const reportedCapability = device.remoteDesktopCapability || device.remote_desktop_capability || {};
   const runtimeState = reportedCapability.state || 'not_ready';
   const captureState = reportedCapability.screenCapture || 'not_ready';
@@ -76,9 +64,9 @@ function desktopCapabilityForDevice(device, options = {}) {
     label: runtimeReady
       ? 'Remote desktop is ready.'
       : 'Remote desktop signaling is ready; desktop capture/input runtime is not ready yet.',
-    ice,
     runtime: {
-      webrtcSignaling: 'available',
+      relay: 'websocket-relay',
+      webrtcSignaling: 'websocket-relay',
       screenCapture: captureState,
       input: inputState,
       mediaTransport: runtimeReady ? 'available' : 'not_ready',

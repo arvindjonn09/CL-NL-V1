@@ -11,8 +11,8 @@ RUN_DIR="$PROJECT_ROOT/.run"
 BACKEND_LOCAL="http://localhost:3000/health"
 FRONTEND_LOCAL="http://localhost:3201"
 ROUTER_LOCAL="http://localhost:3001"
-BACKEND_PUBLIC="https://setuapi.shivomsangha.com/health"
-FRONTEND_PUBLIC="https://setulink.shivomsangha.com"
+BACKEND_PUBLIC="https://netraapi.shivomsangha.com/health"
+FRONTEND_PUBLIC="https://netralink.shivomsangha.com"
 TIMEOUT="${TIMEOUT:-45}"
 
 RESTART=0

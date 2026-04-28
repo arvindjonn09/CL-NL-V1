@@ -36,7 +36,7 @@ If this fails: install Go, install Inno Setup 6, pass `-InnoSetupCompiler` with 
 4. To bake a different backend API URL:
 
 ```powershell
-.\build.ps1 -Clean -DefaultBackendURL "https://setuapi.shivomsangha.com" -Version "0.1.0"
+.\build.ps1 -Clean -DefaultBackendURL "https://netraapi.shivomsangha.com" -Version "0.1.0"
 ```
 
 Expected result: the installer is built with the API host as the default backend URL.
@@ -73,7 +73,7 @@ assets\ffmpeg\ffmpeg.exe
 2. To override the backend URL at install time:
 
 ```powershell
-.\dist\SetuLinkSetup.exe /BACKENDURL="https://setuapi.shivomsangha.com"
+.\dist\SetuLinkSetup.exe /BACKENDURL="https://netraapi.shivomsangha.com"
 ```
 
 Expected result: the installer probes `<backend-url>/health`, writes config, copies bundled ffmpeg to `C:\Program Files\SetuLink\ffmpeg\`, installs or updates `SetuLinkAgent`, starts the service, and validates service installation, service running state, registration or heartbeat, and installed bundled ffmpeg.
@@ -186,13 +186,13 @@ Expected result: structured JSON log entries show binary identity, startup check
 The startup capability log should have this shape:
 
 ```json
-{"component":"runtime","action":"remote-desktop-capability","message":"remote desktop capability summary","metadata":{"remoteDesktopCapabilityState":"ready","ffmpegPath":"C:\\Program Files\\SetuLink\\ffmpeg\\ffmpeg.exe","ffmpegSource":"bundled","reason":"Windows ffmpeg gdigrab capture and WebRTC runtime ready"}}
+{"component":"runtime","action":"remote-desktop-capability","message":"remote desktop capability summary","metadata":{"remoteDesktopCapabilityState":"ready","ffmpegPath":"C:\\Program Files\\SetuLink\\ffmpeg\\ffmpeg.exe","ffmpegSource":"bundled","reason":"Windows JPEG capture and websocket relay runtime ready"}}
 ```
 
 3. Check backend health from the device:
 
 ```powershell
-Invoke-RestMethod "https://setuapi.shivomsangha.com/health"
+Invoke-RestMethod "https://netraapi.shivomsangha.com/health"
 ```
 
 Expected result: the backend responds successfully.
