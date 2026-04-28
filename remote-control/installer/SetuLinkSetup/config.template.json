@@ -1,0 +1,15 @@
+{
+  "backendUrl": "https://setuapi.shivomsangha.com",
+  "serverUrl": "https://setuapi.shivomsangha.com",
+  "agentToken": "setulink-dev-agent-secret",
+  "environmentLabel": "unknown",
+  "deviceId": "",
+  "deviceIdentityMode": "auto",
+  "installId": "",
+  "logPath": "C:\\ProgramData\\SetuLink\\logs\\agent.log",
+  "dataPath": "C:\\ProgramData\\SetuLink\\data",
+  "tempPath": "C:\\ProgramData\\SetuLink\\temp",
+  "firstRunAt": "",
+  "version": "0.1.0",
+  "os": "windows"
+}

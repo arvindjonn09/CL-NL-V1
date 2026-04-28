@@ -1,0 +1,14 @@
+const HEARTBEAT_THRESHOLDS_SECONDS = {
+  healthy: Number(process.env.HEALTHY_HEARTBEAT_SECONDS || 60),
+  warning: Number(process.env.WARNING_HEARTBEAT_SECONDS || 180),
+  offline: Number(process.env.OFFLINE_HEARTBEAT_SECONDS || 300),
+};
+
+const RECENT_ERROR_SECONDS = Number(process.env.RECENT_ERROR_SECONDS || 300);
+const RECENT_WARNING_SECONDS = Number(process.env.RECENT_WARNING_SECONDS || 300);
+
+module.exports = {
+  HEARTBEAT_THRESHOLDS_SECONDS,
+  RECENT_ERROR_SECONDS,
+  RECENT_WARNING_SECONDS,
+};

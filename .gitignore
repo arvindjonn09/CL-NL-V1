@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+remote-control/web/.next/
+remote-control/web/out/
+remote-control/web/.nextrc*
+
+# Build outputs
+remote-control/server/dist/
+remote-control/web/dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pids/
+.logs/
+.run/
+
+# Environment variables (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Application specific
+remote-control/server/uploads/
+*.pid
+remote-control-agent.exe
+setulink-agent.exe
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dll
+
+# Cache
+.claude/
+
+# Backups
+*.bak
+*.backup

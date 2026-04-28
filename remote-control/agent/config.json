@@ -1,0 +1,7 @@
+{
+  "serverUrl": "http://localhost:3000",
+  "backendUrl": "http://localhost:3000",
+  "agentToken": "setulink-dev-agent-secret",
+  "environmentLabel": "unknown",
+  "os": "windows"
+}
