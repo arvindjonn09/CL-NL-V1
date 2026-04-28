@@ -1,88 +1,115 @@
 # Project Documentation Index
 
-## 📚 Quick Start Guide
+## 📚 Complete Documentation Set
 
-You now have **4 comprehensive documentation files** to understand your project architecture:
+You now have **6 comprehensive documentation files** to understand and manage your project:
 
-### 1. **ARCHITECTURE.md** - Complete System Overview
+### 1. **QUICK_REFERENCE.md** ⭐ START HERE
+Essential commands, URLs, and troubleshooting. Use this for day-to-day operations.
+- Health check commands
+- How to start/stop services
+- Common issues & solutions
+- File locations
+- Database management
+
+### 2. **PRODUCTION_SETUP.md** - Current Production Configuration
+Complete guide to your actual production setup on Vultr.
+- Port assignments (3000, 3001, 3201, 3478)
+- Hard-locked port restrictions
+- Service management procedures
+- Environment variables
+- Troubleshooting guide
+- Cloud migration considerations
+
+### 3. **ARCHITECTURE.md** - System Architecture Overview
+Complete system design and components.
 - System architecture diagrams
-- Component breakdown (Frontend, Backend, Go Agent, TURN Server, Database)
-- Communication flow between components
+- Component breakdown (Frontend, Backend, Go Agent, TURN, Database)
+- Communication flows
 - Security highlights
 - Directory structure
 
-**Start here to understand the whole system.**
+### 4. **DEPENDENCIES.md** - Complete Dependency Analysis
+Deep dive into all libraries and packages.
+- Backend dependencies (12 core)
+- Frontend dependencies (10 core)
+- Dependency tree visualization
+- Security & performance notes
+- Vulnerability audit commands
 
----
+### 5. **ARCHITECTURE_DIAGRAMS.md** - Visual Flowcharts
+Mermaid diagrams for understanding system flows.
+- Component interactions
+- Data flows
+- Authentication sequence
+- Go Agent communication
+- Deployment architecture
+- Cloud migration path
 
-### 2. **DEPENDENCIES.md** - Dependency Analysis
-- Complete dependency tree
-- What each package does
-- Security & performance considerations
-- Dependency audit commands
-- Cloud migration preparation
-
-**Use this to understand what libraries you're using and why.**
-
----
-
-### 3. **ARCHITECTURE_DIAGRAMS.md** - Visual Diagrams
-- Mermaid flowcharts for:
-  - Component interactions
-  - Data flows
-  - Authentication process
-  - Go Agent communication
-  - Deployment architecture
-  - Tech stack layers
-  - Cloud migration path
-  - File structure
-
-**View these diagrams in VS Code with Markdown Preview.**
-
----
-
-### 4. **CLAUDE.md** - Operating Notes
-- Already exists in your repo
-- Contains critical information about:
-  - Fixed port mappings (3000, 3001, 3478)
-  - Cloudflare tunnel configuration
-  - Do NOT change port 3478 warning
-
-**Always reference before making deployment changes.**
+### 6. **CLAUDE.md** - Critical Operating Notes
+(Located in `remote-control/` subdirectory)
+- Fixed port mappings
+- Hard-locked port restrictions
+- DO NOT CHANGE warnings
+- Health check procedures
 
 ---
 
 ## 🎯 How to Use These Docs
 
+### For Day-to-Day Operations
+```
+START: QUICK_REFERENCE.md → Get common commands
+     → Health check
+     → Start/stop services
+     → Troubleshoot issues
+```
+
+### For Understanding Production Setup
+```
+START: PRODUCTION_SETUP.md → Learn current configuration
+     → Understand port assignments
+     → See service management
+     → Learn environment variables
+```
+
 ### For Understanding Architecture
 ```
-1. Read ARCHITECTURE.md (5-10 min) → Get overview
-2. View ARCHITECTURE_DIAGRAMS.md → Visual understanding
-3. Check CLAUDE.md → Production details
+START: ARCHITECTURE.md (5-10 min)
+     ↓
+THEN: View ARCHITECTURE_DIAGRAMS.md (visual understanding)
+     ↓
+THEN: Check QUICK_REFERENCE.md (operational)
+```
+
+### For Debugging Issues
+```
+START: QUICK_REFERENCE.md → Troubleshooting section
+     → Find command to diagnose issue
+     ↓
+THEN: PRODUCTION_SETUP.md → Configuration details
+     ↓
+THEN: ARCHITECTURE_DIAGRAMS.md → Data flow analysis
 ```
 
 ### For Cloud Migration
 ```
-1. ARCHITECTURE.md → "Cloud Migration Path" section
-2. DEPENDENCIES.md → "Dependency Recommendations for Cloud Migration"
-3. ARCHITECTURE_DIAGRAMS.md → "Cloud Migration Path" diagram
-4. CLAUDE.md → Port configuration checklist
+START: PRODUCTION_SETUP.md → "Cloud Migration Considerations" section
+     ↓
+THEN: ARCHITECTURE_DIAGRAMS.md → "Cloud Migration Path" diagram
+     ↓
+THEN: DEPENDENCIES.md → "Dependency Recommendations for Cloud Migration"
 ```
 
 ### For Adding Features
 ```
-1. ARCHITECTURE.md → Locate component in structure
-2. ARCHITECTURE_DIAGRAMS.md → Data Flow diagram
-3. DEPENDENCIES.md → Check if dependency exists
-4. Build on existing patterns
-```
-
-### For Debugging
-```
-1. ARCHITECTURE_DIAGRAMS.md → Data Flow diagrams
-2. ARCHITECTURE.md → Component communication
-3. DEPENDENCIES.md → Library documentation
-4. CLAUDE.md → Operational status
+START: ARCHITECTURE.md → Locate relevant component
+     ↓
+THEN: ARCHITECTURE_DIAGRAMS.md → See data flow
+     ↓
+THEN: DEPENDENCIES.md → Check if needed libraries exist
+     ↓
+THEN: Code it following existing patterns
 ```
 
 ---
@@ -92,10 +119,11 @@ You now have **4 comprehensive documentation files** to understand your project 
 ### Your Stack at a Glance
 
 ```
-Frontend:  Next.js 16 + React 19 + TailwindCSS
-Backend:   Express.js 5 + PostgreSQL + WebSockets
-Agent:     Go (custom application)
-Relay:     TURN/STUN server (WebRTC)
+Frontend:  Next.js 16 + React 19 + TailwindCSS (Port 3201)
+Router:    Origin Router for host-based routing (Port 3001) ⭐
+Backend:   Express.js 5 + PostgreSQL + WebSockets (Port 3000)
+Agent:     Go (custom application on remote devices)
+Relay:     TURN/STUN server (WebRTC) - Port 3478
 Tunnel:    Cloudflare (no direct internet exposure)
 ```
 
@@ -104,16 +132,24 @@ Tunnel:    Cloudflare (no direct internet exposure)
 - **Frontend**: 10 direct + 500+ transitive (Next.js)
 - **Agent**: Go standard library (compiled binary)
 
-### Critical Ports (DO NOT CHANGE)
+### Critical Ports (⚠️ DO NOT CHANGE)
+- `3001` - **Origin Router** (Cloudflare hard-locked)
+- `3201` - Next.js Frontend (behind router)
 - `3000` - Backend API (Cloudflare hard-locked)
-- `3001` - Frontend (Cloudflare hard-locked)
-- `3478` - TURN/STUN (Cloudflare hard-locked)
+- `3478` - TURN/STUN (Cloudflare CRITICAL hard-lock) ⚠️⚠️⚠️
+
+### New Finding: Origin Router
+Your actual architecture includes an **Origin Router** pattern:
+- Cloudflare tunnel routes to Port 3001 (Origin Router)
+- Origin Router forwards to Port 3201 (Next.js Frontend)
+- Backend API runs independently on Port 3000
+- This enables host-based routing for multi-tenant or multi-domain setups
 
 ### Security: ✅ Good
 - JWT + bcrypt authentication
 - CORS protection
-- PostgreSQL for data
-- No direct internet exposure (Cloudflare tunnel)
+- PostgreSQL for secure data storage
+- No direct internet exposure (Cloudflare tunnel + Origin Router)
 
 ---
 
@@ -124,7 +160,9 @@ Users (Browser/App)
     ↓
 Cloudflare Tunnel (SSL/TLS)
     ↓
-Next.js Frontend (Port 3001)
+Origin Router (Port 3001)
+    ↓
+Next.js Frontend (Port 3201)
     ↓
 Express Backend (Port 3000)
     ↓

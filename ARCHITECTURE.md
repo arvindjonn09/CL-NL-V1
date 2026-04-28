@@ -18,30 +18,58 @@
     │  └─ https://netraturn.shivomsangha.com → :3478 (TURN)     │
     └────┬──────────────────┬──────────────────┬─────────────────┘
          │                  │                  │
-    ┌────▼──────┐    ┌─────▼──────┐    ┌─────▼────────┐
-    │ FRONTEND  │    │  BACKEND   │    │ TURN/STUN    │
-    │ (Port 3001)    │ (Port 3000)    │ (Port 3478)  │
-    └───────────┘    └────────────┘    └──────────────┘
-         │                  │                  │
-    ┌────▼──────────────────▼──────────────────▼─────┐
-    │         PostgreSQL Database                    │
-    │         (Device registry, user auth, logs)     │
-    └──────────────────────────────────────────────┘
-         │
-    ┌────▼──────────────────────────────────────────┐
-    │    GO AGENT (Runs on Remote Devices)          │
-    │    - Device registration & heartbeat          │
-    │    - Remote desktop streaming                 │
-    │    - File transfer                            │
-    │    - Command execution                        │
-    └───────────────────────────────────────────────┘
+    ┌────▼──────────────┐   │            ┌────▼────────┐
+    │ ORIGIN ROUTER    │   │            │ TURN/STUN   │
+    │ (Port 3001)      │   │            │ (Port 3478) │
+    │ ↓                │   │            └─────────────┘
+    │ Next.js Frontend │   │
+    │ (Port 3201)      │   │
+    └──────────────────┘   │
+         │                 ▼
+         │          ┌──────────────┐
+         │          │  BACKEND API │
+         │          │ (Port 3000)  │
+         └─────────→│ Express.js   │
+                    └──────────────┘
+                          │
+                          ▼
+                    ┌────────────────┐
+                    │  PostgreSQL    │
+                    │  Database      │
+                    └────────────────┘
+                          │
+                          ▼
+                    ┌────────────────┐
+                    │   GO AGENT     │
+                    │ Remote Devices │
+                    └────────────────┘
 ```
+
+### Port Mapping (Cloudflare Hard-Locked)
+- **Port 3001**: Origin Router (routes to frontend)
+- **Port 3201**: Next.js Frontend (behind origin router)
+- **Port 3000**: Backend API (Express.js)
+- **Port 3478**: TURN/STUN Server (WebRTC relay) ⚠️ HARD-LOCKED
 
 ---
 
 ## 📦 Component Breakdown
 
-### 1. **Frontend (Next.js on Port 3001)**
+### 1. **Origin Router (Port 3001)**
+**Location**: `/remote-control/scripts/origin-router.js`  
+**Purpose**: 
+- Routes Cloudflare tunnel traffic to appropriate origin services
+- Maps `netralink.shivomsangha.com` → Port 3201 (Next.js)
+- Routes to backend API as needed
+
+**Key Features**:
+- Host-based routing
+- Request forwarding
+- Cloudflare tunnel integration point
+
+---
+
+### 2. **Frontend (Next.js on Port 3201)**
 **Location**: `/remote-control/web/`  
 **Tech Stack**: 
 - Next.js 16.2.3 (React 19.2.4)
@@ -63,7 +91,7 @@ react, react-dom, next, tailwindcss, typescript
 
 ---
 
-### 2. **Backend API (Express.js on Port 3000)**
+### 3. **Backend API (Express.js on Port 3000)**
 **Location**: `/remote-control/server/src/`  
 **Tech Stack**: 
 - Express.js 5.2.1 (Node.js)
@@ -95,7 +123,7 @@ ws (WebSockets), dotenv, uuid
 
 ---
 
-### 3. **Go Agent (Remote Device Control)**
+### 4. **Go Agent (Remote Device Control)**
 **Location**: `/remote-control/agent/`  
 **Language**: Go
 
@@ -128,20 +156,20 @@ action_*.go             - Platform-specific actions
 
 ---
 
-### 4. **TURN/STUN Server (Port 3478)**
+### 5. **TURN/STUN Server (Port 3478)**
 **Purpose**: WebRTC peer connection relay  
 **Why**: Helps devices behind NAT/firewalls establish peer connections  
 **⚠️ HARD-LOCKED**: Must always run on port 3478 (Cloudflare tunneled)
 
 ---
 
-### 5. **Shared Code**
+### 6. **Shared Code**
 **Location**: `/remote-control/shared/`  
 **Purpose**: Common utilities, types, and constants used across components
 
 ---
 
-### 6. **Database**
+### 7. **Database**
 **Type**: PostgreSQL  
 **Contains**:
 - User accounts & credentials
@@ -178,15 +206,18 @@ action_*.go             - Platform-specific actions
 
 ---
 
-## 🚀 Deployment Ports (Fixed)
+## 🚀 Deployment Ports (Fixed - Cloudflare Hard-Locked)
 
 | Service | Port | URL | Purpose |
 |---------|------|-----|---------|
-| Frontend | 3001 | `https://netralink.shivomsangha.com` | Web UI |
+| Origin Router | 3001 | `https://netralink.shivomsangha.com` | Routes to frontend |
+| Next.js Frontend | 3201 | (behind 3001) | Web UI |
 | Backend API | 3000 | `https://netraapi.shivomsangha.com` | API endpoints |
 | TURN/STUN | 3478 | `https://netraturn.shivomsangha.com` | WebRTC relay |
 
 All routed through **Cloudflare Tunnel** (no direct internet exposure).
+
+⚠️ **Port 3478 HARD-LOCKED** - See CLAUDE.md for restrictions
 
 ---
 

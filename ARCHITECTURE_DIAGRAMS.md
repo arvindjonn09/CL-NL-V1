@@ -15,7 +15,8 @@ graph TB
     end
     
     subgraph cloud["☁️ Your Server (Vultr → Cloud)"]
-        frontend["🎨 Frontend<br/>Next.js :3001"]
+        router["🔀 Origin Router<br/>:3001"]
+        frontend["🎨 Frontend<br/>Next.js :3201"]
         backend["⚙️ Backend API<br/>Express :3000"]
         turn["📡 TURN/STUN<br/>:3478"]
         db[(🗄️ PostgreSQL<br/>Database)]
@@ -25,10 +26,11 @@ graph TB
     mobile -->|HTTPS| cf
     device -->|HTTPS/UDP| cf
     
-    cf -->|HTTP| frontend
+    cf -->|HTTP| router
     cf -->|HTTP| backend
     cf -->|UDP/TCP| turn
     
+    router -->|Route| frontend
     frontend -->|API Calls| backend
     backend -->|WebSocket| frontend
     backend -->|Query/Insert| db
@@ -47,6 +49,7 @@ graph TB
     style device fill:#9C27B0
     style turn fill:#00BCD4
     style cf fill:#FFC107
+    style router fill:#FF5722
 ```
 
 ---
@@ -186,12 +189,18 @@ graph LR
         lb["Load Balancer"]
         
         subgraph instances["Compute Instances<br/>(Auto-scaling)"]
-            app1["Node.js + Next.js<br/>Instance 1"]
-            app2["Node.js + Next.js<br/>Instance 2"]
-            appN["Node.js + Next.js<br/>Instance N"]
+            router1["Origin Router<br/>Port 3001"]
+            app1["Backend API<br/>Port 3000"]
+            app2["Backend API<br/>Port 3000"]
+            appN["Backend API<br/>Port 3000"]
         end
         
-        turn_server["TURN Server<br/>Instance"]
+        subgraph frontend_instances["Frontend Instances"]
+            web1["Next.js<br/>Port 3201"]
+            web2["Next.js<br/>Port 3201"]
+        end
+        
+        turn_server["TURN Server<br/>Port 3478"]
         
         subgraph storage["Storage"]
             db_primary["PostgreSQL<br/>Primary"]
@@ -208,9 +217,13 @@ graph LR
     cdn -->|Cache| tunnel
     tunnel -->|Route| lb
     
-    lb -->|Distribute| app1
-    lb -->|Distribute| app2
-    lb -->|Distribute| appN
+    lb -->|Port 3001| router1
+    lb -->|Port 3000| app1
+    lb -->|Port 3000| app2
+    lb -->|Port 3000| appN
+    
+    router1 -->|Forward| web1
+    router1 -->|Forward| web2
     
     app1 -->|Query| db_primary
     app2 -->|Query| db_primary
@@ -231,6 +244,7 @@ graph LR
     style users fill:#4CAF50
     style cdn fill:#FFC107
     style tunnel fill:#FFC107
+    style router1 fill:#FF5722
     style app1 fill:#2196F3
     style db_primary fill:#F44336
     style uploads fill:#9C27B0
@@ -244,16 +258,17 @@ graph LR
 ```mermaid
 graph TB
     subgraph client_layer["CLIENT LAYER"]
-        web["🌐 Web UI<br/>Next.js 16<br/>React 19<br/>TailwindCSS"]
+        web["🌐 Web UI<br/>Next.js 16<br/>React 19<br/>TailwindCSS<br/>Port 3201"]
         mobile["📱 Mobile<br/>Via Browser<br/>Responsive"]
     end
     
     subgraph network["NETWORK LAYER"]
         cf["Cloudflare Tunnel<br/>SSL/TLS<br/>DDoS Protection"]
+        router["Origin Router<br/>Port 3001<br/>Host-based Routing"]
     end
     
     subgraph api_layer["API LAYER"]
-        express["Express.js 5.2<br/>REST API<br/>HTTP/HTTPS"]
+        express["Express.js 5.2<br/>REST API<br/>HTTP/HTTPS<br/>Port 3000"]
         ws["WebSocket (ws 8.20)<br/>Real-time<br/>Bidirectional"]
     end
     
@@ -270,7 +285,7 @@ graph TB
     end
     
     subgraph edge["EDGE / RELAY"]
-        turn["TURN/STUN<br/>WebRTC<br/>NAT Traversal"]
+        turn["TURN/STUN<br/>WebRTC<br/>NAT Traversal<br/>Port 3478"]
     end
     
     subgraph agent_layer["REMOTE DEVICES"]
@@ -279,6 +294,8 @@ graph TB
     
     web -->|HTTPS| cf
     mobile -->|HTTPS| cf
+    cf -->|HTTP| router
+    router -->|HTTP| web
     cf -->|HTTP| express
     cf -->|WS| ws
     cf -->|UDP/TCP| turn
@@ -304,6 +321,7 @@ graph TB
     turn -.->|Relay| agent
     
     style web fill:#FF9800
+    style router fill:#FF5722
     style cf fill:#FFC107
     style express fill:#2196F3
     style postgres fill:#F44336
