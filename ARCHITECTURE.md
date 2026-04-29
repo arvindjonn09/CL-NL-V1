@@ -169,7 +169,29 @@ action_*.go             - Platform-specific actions
 
 ---
 
-### 7. **Database**
+### 7. **Electron Desktop Client** ⭐ NEW
+**Location**: `/remote-control/electron/` (planned)  
+**Tech**: Electron + Next.js wrapper
+
+**Key Features**:
+- Native desktop application wrapper for remote desktop sessions
+- Keyboard hook system (forwards all keys including Win, Alt+Tab to remote)
+- Clipboard sync (bidirectional)
+- Pointer lock for seamless mouse control
+- Frameless full-screen window
+- RDP-like user experience
+
+**Use Case**: 
+- Users can run native desktop app instead of browser
+- Professional remote desktop experience
+- Better control over keyboard shortcuts
+- More responsive UI
+
+See `ELECTRON_CLIENT_SPEC.md` for full implementation details.
+
+---
+
+### 8. **Database**
 **Type**: PostgreSQL  
 **Contains**:
 - User accounts & credentials

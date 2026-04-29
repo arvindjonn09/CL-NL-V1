@@ -6,6 +6,7 @@
 graph TB
     subgraph clients["👥 Clients"]
         browser["🌐 Web Browser<br/>https://netralink.shivomsangha.com"]
+        desktop_app["🖥️ Electron App<br/>Native Desktop Client"]
         mobile["📱 Mobile/Desktop App"]
         device["🖥️ Remote Device<br/>with Agent"]
     end
@@ -23,6 +24,7 @@ graph TB
     end
     
     browser -->|HTTPS| cf
+    desktop_app -->|HTTPS| cf
     mobile -->|HTTPS| cf
     device -->|HTTPS/UDP| cf
     
@@ -31,6 +33,7 @@ graph TB
     cf -->|UDP/TCP| turn
     
     router -->|Route| frontend
+    desktop_app -->|Direct WebSocket| backend
     frontend -->|API Calls| backend
     backend -->|WebSocket| frontend
     backend -->|Query/Insert| db
@@ -43,6 +46,7 @@ graph TB
     turn -->|Relay| browser
     
     style browser fill:#4CAF50
+    style desktop_app fill:#9C27B0
     style backend fill:#2196F3
     style frontend fill:#FF9800
     style db fill:#F44336
@@ -259,6 +263,7 @@ graph LR
 graph TB
     subgraph client_layer["CLIENT LAYER"]
         web["🌐 Web UI<br/>Next.js 16<br/>React 19<br/>TailwindCSS<br/>Port 3201"]
+        electron["🖥️ Electron App<br/>Native Desktop<br/>Keyboard Hooks<br/>Clipboard Sync<br/>Pointer Lock"]
         mobile["📱 Mobile<br/>Via Browser<br/>Responsive"]
     end
     
@@ -293,6 +298,7 @@ graph TB
     end
     
     web -->|HTTPS| cf
+    electron -->|HTTPS/WebSocket| cf
     mobile -->|HTTPS| cf
     cf -->|HTTP| router
     router -->|HTTP| web
@@ -321,6 +327,7 @@ graph TB
     turn -.->|Relay| agent
     
     style web fill:#FF9800
+    style electron fill:#9C27B0
     style router fill:#FF5722
     style cf fill:#FFC107
     style express fill:#2196F3

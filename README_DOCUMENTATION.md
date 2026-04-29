@@ -53,6 +53,14 @@ Mermaid diagrams for understanding system flows.
 - DO NOT CHANGE warnings
 - Health check procedures
 
+### 7. **ELECTRON_CLIENT_SPEC.md** ⭐ NEW - Desktop Client Specification
+(Located in `remote-control/` subdirectory)
+- Electron-based desktop client for remote desktop sessions
+- Native keyboard hooks and clipboard sync
+- Pointer lock for seamless control
+- Full-screen frameless window interface
+- Implementation roadmap and API specifications
+
 ---
 
 ## 🎯 How to Use These Docs
