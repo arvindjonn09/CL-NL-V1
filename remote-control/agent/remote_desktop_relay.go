@@ -71,7 +71,11 @@ func StartRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string,
 }
 
 func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, writeJSON func(any) error, writeBinary func([]byte) error) error {
-	logger("remote-desktop").Info("relay-start", "remote desktop websocket relay starting", logMetadata("sessionId", sessionID))
+	startedAt := time.Now()
+	elapsed := func() int64 {
+		return time.Since(startedAt).Milliseconds()
+	}
+	logger("remote-desktop").Info("relay-start", "remote desktop websocket relay starting", logMetadata("sessionId", sessionID, "elapsedMs", elapsed()))
 	if err := SendRemoteDesktopStatus(cfg, sessionID, "media_starting", "agent websocket relay starting"); err != nil {
 		return err
 	}
@@ -81,11 +85,13 @@ func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, w
 		return fmt.Errorf("create desktop helper pipe: %w", err)
 	}
 	defer pipeServer.Close()
+	logger("remote-desktop").Info("pipe-created", "remote desktop helper pipe created", logMetadata("sessionId", sessionID, "elapsedMs", elapsed()))
 
 	helper, err := launchDesktopHelper(ctx, sessionID, pipeServer.name)
 	if err != nil {
 		return fmt.Errorf("launch desktop helper: %w", err)
 	}
+	logger("remote-desktop").Info("helper-launched", "remote desktop helper process launched", logMetadata("sessionId", sessionID, "elapsedMs", elapsed()))
 	defer func() {
 		_ = helper.Kill()
 	}()
@@ -134,7 +140,7 @@ func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, w
 		_ = writeDesktopPipeMessage(pipe, desktopPipeMessageStop, nil)
 	}()
 
-	logger("remote-desktop").Info("helper-connected", "remote desktop helper connected to pipe", logMetadata("sessionId", sessionID))
+	logger("remote-desktop").Info("helper-connected", "remote desktop helper connected to pipe", logMetadata("sessionId", sessionID, "elapsedMs", elapsed()))
 	firstFrame := true
 
 	for {
@@ -165,7 +171,7 @@ func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, w
 			if err := SendRemoteDesktopStatus(cfg, sessionID, "connected", "agent websocket relay publishing jpeg frames"); err != nil {
 				return err
 			}
-			firstFrame = false
+			logger("remote-desktop").Info("first-frame-received", "first desktop helper frame received", logMetadata("sessionId", sessionID, "elapsedMs", elapsed(), "captureAgeMs", time.Now().UnixMilli()-frameHeader.CapturedAt))
 		}
 
 		websocketPayload, err := encodeRemoteDesktopBinaryFrame(remoteDesktopRelayFrame{
@@ -182,6 +188,10 @@ func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, w
 		}
 		if err := writeBinary(websocketPayload); err != nil {
 			return fmt.Errorf("send desktop frame: %w", err)
+		}
+		if firstFrame {
+			logger("remote-desktop").Info("first-frame-sent", "first desktop frame sent to websocket relay", logMetadata("sessionId", sessionID, "elapsedMs", elapsed()))
+			firstFrame = false
 		}
 	}
 }

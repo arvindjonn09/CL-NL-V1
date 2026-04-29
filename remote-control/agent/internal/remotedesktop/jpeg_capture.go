@@ -5,3 +5,9 @@ type JPEGFrame struct {
 	Width  int
 	Height int
 }
+
+type CaptureOptions struct {
+	TargetWidth  int
+	TargetHeight int
+	ScaleMode    string
+}

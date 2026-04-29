@@ -49,8 +49,7 @@ func prepareRuntime(cfg *Config) error {
 			"state", capability.State,
 			"screenCapture", capability.ScreenCapture,
 			"input", capability.Input,
-			"ffmpegPath", capability.FfmpegPath,
-			"ffmpegSource", capability.FfmpegSource,
+			"relay", capability.Relay,
 			"reason", capability.Reason,
 		))
 	}

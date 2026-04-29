@@ -3,14 +3,18 @@ package remotedesktop
 import "encoding/json"
 
 type ControlMessage struct {
-	Type   string  `json:"type"`
-	X      int     `json:"x,omitempty"`
-	Y      int     `json:"y,omitempty"`
-	XRatio float64 `json:"xRatio,omitempty"`
-	YRatio float64 `json:"yRatio,omitempty"`
-	Button int     `json:"button,omitempty"`
-	Key    string  `json:"key,omitempty"`
-	Code   string  `json:"code,omitempty"`
+	Type             string  `json:"type"`
+	X                int     `json:"x,omitempty"`
+	Y                int     `json:"y,omitempty"`
+	XRatio           float64 `json:"xRatio,omitempty"`
+	YRatio           float64 `json:"yRatio,omitempty"`
+	Button           int     `json:"button,omitempty"`
+	Key              string  `json:"key,omitempty"`
+	Code             string  `json:"code,omitempty"`
+	Width            int     `json:"width,omitempty"`
+	Height           int     `json:"height,omitempty"`
+	ScaleMode        string  `json:"scaleMode,omitempty"`
+	DevicePixelRatio float64 `json:"devicePixelRatio,omitempty"`
 }
 
 func DecodeControlMessage(data []byte) (ControlMessage, error) {

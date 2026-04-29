@@ -73,7 +73,6 @@ func SendHeartbeat(cfg *Config) error {
 			"tempPath":        cfg.TempPath,
 			"filesPath":       cfg.FilesPath,
 			"deviceStatePath": cfg.DeviceStatePath,
-			"ffmpegPath":      remoteDesktopCapability.FfmpegPath,
 		},
 	}
 

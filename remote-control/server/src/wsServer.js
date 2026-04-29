@@ -13,8 +13,11 @@ const connectedAgents = new Map();
  */
 const browserClientsByDevice = new Map();
 const remoteDesktopBrowsersBySession = new Map();
+const remoteDesktopFrameSendState = new WeakMap();
+const remoteDesktopFirstFrameLogged = new Set();
 const remoteDesktopBinaryMagic = Buffer.from('RDF1');
 const remoteDesktopMaxBufferedBytes = Number(process.env.REMOTE_DESKTOP_MAX_BUFFERED_BYTES || 8 * 1024 * 1024);
+const remoteDesktopSendRetryMs = Number(process.env.REMOTE_DESKTOP_SEND_RETRY_MS || 16);
 
 function initWebSocket(server, options = {}) {
   const { pool = null, userStore = null } = options;
@@ -169,6 +172,7 @@ async function remoteUserFromRequest(req, { pool, userStore }) {
 }
 
 async function acceptRemoteDesktopBrowser(ws, req, { pool, userStore }) {
+  const acceptedAt = Date.now();
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     const deviceId = decodeURIComponent(url.pathname.replace('/api/remoteaccess/ws/', '').split('/')[0] || '');
@@ -218,6 +222,7 @@ async function acceptRemoteDesktopBrowser(ws, req, { pool, userStore }) {
     });
 
     ws.send(JSON.stringify({ type: 'remote-desktop-ready', sessionId, deviceId }));
+    console.log(`Remote desktop browser accepted: ${deviceId} sessionId=${sessionId} elapsedMs=${Date.now() - acceptedAt}`);
     const agent = connectedAgents.get(deviceId);
     if (!agent || agent.readyState !== WebSocket.OPEN) {
       ws.close(1011, 'Agent unavailable');
@@ -230,6 +235,7 @@ async function acceptRemoteDesktopBrowser(ws, req, { pool, userStore }) {
       deviceId,
       transport: 'jpeg-websocket',
     }));
+    console.log(`Remote desktop start sent to agent: ${deviceId} sessionId=${sessionId} elapsedMs=${Date.now() - acceptedAt}`);
 
     await setRemoteDesktopStatus(pool, sessionId, 'media_starting', 'browser websocket attached');
     console.log(`Remote desktop relay paired: ${deviceId} sessionId=${sessionId}`);
@@ -249,11 +255,13 @@ function addRemoteDesktopBrowser(sessionId, ws) {
 }
 
 function removeRemoteDesktopBrowser(sessionId, ws) {
+  clearRemoteDesktopFrameSendState(ws);
   const clients = remoteDesktopBrowsersBySession.get(sessionId);
   if (!clients) return false;
   clients.delete(ws);
   if (clients.size === 0) {
     remoteDesktopBrowsersBySession.delete(sessionId);
+    remoteDesktopFirstFrameLogged.delete(sessionId);
     return true;
   }
   return false;
@@ -275,12 +283,91 @@ function sendToRemoteDesktopBrowsers(sessionId, payload, options = {}) {
   const body = options.binary ? payload : JSON.stringify(payload);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
-      if (options.binary && client.bufferedAmount > remoteDesktopMaxBufferedBytes) {
+      if (options.binary) {
+        queueRemoteDesktopFrameForClient(client, body);
         continue;
       }
       client.send(body, options.binary ? { binary: true } : undefined);
     }
   }
+}
+
+function queueRemoteDesktopFrameForClient(client, payload) {
+  let state = remoteDesktopFrameSendState.get(client);
+  if (!state) {
+    state = {
+      sending: false,
+      pending: null,
+      retryTimer: null,
+      droppedFrames: 0,
+      lastDropLogAt: 0,
+    };
+    remoteDesktopFrameSendState.set(client, state);
+  }
+
+  if (state.sending || client.bufferedAmount > remoteDesktopMaxBufferedBytes) {
+    state.pending = payload;
+    state.droppedFrames += 1;
+    maybeLogDroppedRemoteDesktopFrame(client, state);
+    if (!state.sending) scheduleRemoteDesktopFrameRetry(client, state);
+    return;
+  }
+
+  sendRemoteDesktopFrameNow(client, state, payload);
+}
+
+function sendRemoteDesktopFrameNow(client, state, payload) {
+  if (client.readyState !== WebSocket.OPEN) {
+    clearRemoteDesktopFrameSendState(client);
+    return;
+  }
+
+  if (client.bufferedAmount > remoteDesktopMaxBufferedBytes) {
+    state.pending = payload;
+    state.droppedFrames += 1;
+    maybeLogDroppedRemoteDesktopFrame(client, state);
+    scheduleRemoteDesktopFrameRetry(client, state);
+    return;
+  }
+
+  state.sending = true;
+  client.send(payload, { binary: true }, (err) => {
+    state.sending = false;
+    if (err || client.readyState !== WebSocket.OPEN) {
+      clearRemoteDesktopFrameSendState(client);
+      return;
+    }
+
+    const pending = state.pending;
+    state.pending = null;
+    if (pending) {
+      scheduleRemoteDesktopFrameRetry(client, state, pending);
+    }
+  });
+}
+
+function scheduleRemoteDesktopFrameRetry(client, state, payload = null) {
+  if (payload) state.pending = payload;
+  if (state.retryTimer) return;
+  state.retryTimer = setTimeout(() => {
+    state.retryTimer = null;
+    const pending = state.pending;
+    state.pending = null;
+    if (pending) sendRemoteDesktopFrameNow(client, state, pending);
+  }, remoteDesktopSendRetryMs);
+}
+
+function clearRemoteDesktopFrameSendState(client) {
+  const state = remoteDesktopFrameSendState.get(client);
+  if (state?.retryTimer) clearTimeout(state.retryTimer);
+  remoteDesktopFrameSendState.delete(client);
+}
+
+function maybeLogDroppedRemoteDesktopFrame(client, state) {
+  const now = Date.now();
+  if (now - state.lastDropLogAt < 5000) return;
+  state.lastDropLogAt = now;
+  console.log(`Remote desktop frame coalescing active: bufferedAmount=${client.bufferedAmount} droppedFrames=${state.droppedFrames}`);
 }
 
 function parseRemoteDesktopBinaryFrame(message) {
@@ -296,12 +383,17 @@ function parseRemoteDesktopBinaryFrame(message) {
   }
   const header = JSON.parse(buffer.subarray(headerStart, headerEnd).toString('utf8'));
   if (!header.sessionId) return null;
-  return { sessionId: header.sessionId, buffer };
+  return { sessionId: header.sessionId, capturedAt: header.capturedAt || null, buffer };
 }
 
 function relayRemoteDesktopBinaryFrame(message) {
   const frame = parseRemoteDesktopBinaryFrame(message);
   if (!frame) return;
+  if (!remoteDesktopFirstFrameLogged.has(frame.sessionId)) {
+    remoteDesktopFirstFrameLogged.add(frame.sessionId);
+    const captureAgeMs = frame.capturedAt ? Date.now() - frame.capturedAt : null;
+    console.log(`Remote desktop first frame relayed: sessionId=${frame.sessionId} captureAgeMs=${captureAgeMs}`);
+  }
   sendToRemoteDesktopBrowsers(frame.sessionId, frame.buffer, { binary: true });
 }
 

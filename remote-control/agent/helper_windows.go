@@ -22,6 +22,30 @@ type helperOptions struct {
 	SessionID string
 }
 
+type helperCaptureState struct {
+	mu     sync.RWMutex
+	target agentremotedesktop.CaptureOptions
+}
+
+func (state *helperCaptureState) captureOptions() agentremotedesktop.CaptureOptions {
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.target
+}
+
+func (state *helperCaptureState) setViewport(message agentremotedesktop.ControlMessage) {
+	if message.Width <= 0 || message.Height <= 0 {
+		return
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.target = agentremotedesktop.CaptureOptions{
+		TargetWidth:  message.Width,
+		TargetHeight: message.Height,
+		ScaleMode:    message.ScaleMode,
+	}
+}
+
 func maybeRunHelperMode(args []string) (bool, error) {
 	if !helperFlagPresent(args) {
 		return false, nil
@@ -92,12 +116,13 @@ func RunRemoteDesktopHelper(ctx context.Context, opts helperOptions) error {
 		return writeDesktopPipeMessage(conn, msgType, payload)
 	}
 
+	captureState := &helperCaptureState{}
 	errCh := make(chan error, 2)
 	go func() {
-		errCh <- runHelperCaptureLoop(ctx, writeMsg)
+		errCh <- runHelperCaptureLoop(ctx, writeMsg, captureState)
 	}()
 	go func() {
-		errCh <- runHelperControlLoop(ctx, conn, writeMsg)
+		errCh <- runHelperControlLoop(ctx, conn, writeMsg, captureState)
 	}()
 
 	select {
@@ -120,7 +145,7 @@ func newDesktopHelperLogger() *agentlogging.Logger {
 	return log.WithComponent("remote-desktop").WithRunMode("windows-helper")
 }
 
-func runHelperCaptureLoop(ctx context.Context, writeMsg func(byte, []byte) error) error {
+func runHelperCaptureLoop(ctx context.Context, writeMsg func(byte, []byte) error, captureState *helperCaptureState) error {
 	ticker := time.NewTicker(40 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -131,7 +156,7 @@ func runHelperCaptureLoop(ctx context.Context, writeMsg func(byte, []byte) error
 		case <-ticker.C:
 		}
 
-		frame, err := agentremotedesktop.CaptureJPEG()
+		frame, err := agentremotedesktop.CaptureJPEG(captureState.captureOptions())
 		if err != nil {
 			return fmt.Errorf("capture jpeg desktop frame: %w", err)
 		}
@@ -151,7 +176,7 @@ func runHelperCaptureLoop(ctx context.Context, writeMsg func(byte, []byte) error
 	}
 }
 
-func runHelperControlLoop(ctx context.Context, conn desktopPipeConn, writeMsg func(byte, []byte) error) error {
+func runHelperControlLoop(ctx context.Context, conn desktopPipeConn, writeMsg func(byte, []byte) error, captureState *helperCaptureState) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -166,6 +191,10 @@ func runHelperControlLoop(ctx context.Context, conn desktopPipeConn, writeMsg fu
 		case desktopPipeMessageInput:
 			control, err := agentremotedesktop.DecodeControlMessage(payload)
 			if err != nil {
+				continue
+			}
+			if control.Type == "viewport" {
+				captureState.setViewport(control)
 				continue
 			}
 			_ = agentremotedesktop.InjectInput(control)

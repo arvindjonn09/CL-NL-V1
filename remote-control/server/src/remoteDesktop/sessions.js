@@ -1,13 +1,6 @@
 const crypto = require('crypto');
-const { publicIceConfig } = require('./config');
-
 const REMOTE_DESKTOP_SESSION_SECONDS = Number(process.env.REMOTE_DESKTOP_SESSION_SECONDS || 10 * 60);
 const REMOTE_DESKTOP_SIGNALING_ENABLED = process.env.REMOTE_DESKTOP_SIGNALING_ENABLED !== 'false';
-
-function safeSignalPayload(payload) {
-  if (!payload || typeof payload !== 'object') return null;
-  return JSON.stringify(payload);
-}
 
 function desktopCapabilityForDevice(device, options = {}) {
   if (!device) {
@@ -66,7 +59,6 @@ function desktopCapabilityForDevice(device, options = {}) {
       : 'Remote desktop signaling is ready; desktop capture/input runtime is not ready yet.',
     runtime: {
       relay: 'websocket-relay',
-      webrtcSignaling: 'websocket-relay',
       screenCapture: captureState,
       input: inputState,
       mediaTransport: runtimeReady ? 'available' : 'not_ready',
@@ -172,81 +164,6 @@ async function getRemoteDesktopSessionForAgent(pool, sessionId, deviceId) {
   return { session, expired: false };
 }
 
-async function listPendingRemoteDesktopSessions(pool, deviceId, limit = 5) {
-  const result = await pool.query(
-    `
-    SELECT id, device_id, status, signaling_state, transport_state, created_at, expires_at
-    FROM remote_desktop_sessions
-    WHERE device_id = $1
-      AND status IN ('waiting_for_agent', 'signaling', 'media_starting')
-      AND expires_at > NOW()
-    ORDER BY created_at ASC
-    LIMIT $2
-    `,
-    [deviceId, limit]
-  );
-  return result.rows;
-}
-
-async function setRemoteDesktopOffer(pool, sessionId, offer) {
-  const result = await pool.query(
-    `
-    UPDATE remote_desktop_sessions
-    SET browser_offer = $2::jsonb,
-        status = 'waiting_for_agent',
-        signaling_state = 'offer-received',
-        transport_state = 'waiting_for_agent',
-        updated_at = NOW()
-    WHERE id = $1
-      AND status IN ('waiting_for_agent', 'signaling', 'media_starting')
-      AND expires_at > NOW()
-    RETURNING *
-    `,
-    [sessionId, safeSignalPayload(offer)]
-  );
-  return result.rows[0] || null;
-}
-
-async function setRemoteDesktopAnswer(pool, sessionId, answer) {
-  const result = await pool.query(
-    `
-    UPDATE remote_desktop_sessions
-    SET agent_answer = $2::jsonb,
-        status = 'media_starting',
-        signaling_state = 'answer-received',
-        transport_state = 'media_starting',
-        updated_at = NOW()
-    WHERE id = $1
-      AND status IN ('waiting_for_agent', 'signaling', 'media_starting')
-      AND expires_at > NOW()
-    RETURNING *
-    `,
-    [sessionId, safeSignalPayload(answer)]
-  );
-  return result.rows[0] || null;
-}
-
-async function appendRemoteDesktopIce(pool, sessionId, side, candidate) {
-  const column = side === 'agent' ? 'agent_ice' : 'browser_ice';
-  const result = await pool.query(
-    `
-    UPDATE remote_desktop_sessions
-    SET ${column} = COALESCE(${column}, '[]'::jsonb) || $2::jsonb,
-        signaling_state = CASE
-          WHEN signaling_state IN ('requested', 'expired') THEN signaling_state
-          ELSE 'ice-exchange'
-        END,
-        updated_at = NOW()
-    WHERE id = $1
-      AND status IN ('waiting_for_agent', 'signaling', 'media_starting', 'connected')
-      AND expires_at > NOW()
-    RETURNING *
-    `,
-    [sessionId, JSON.stringify([candidate])]
-  );
-  return result.rows[0] || null;
-}
-
 async function setRemoteDesktopStatus(pool, sessionId, status, reason = null) {
   const allowed = new Set(['signaling', 'waiting_for_agent', 'media_starting', 'connected', 'ended', 'expired', 'failed', 'denied']);
   const nextStatus = allowed.has(status) ? status : 'failed';
@@ -286,19 +203,6 @@ function publicSession(session) {
     startedAt: session.started_at,
     endedAt: session.ended_at,
     failureReason: session.failure_reason,
-    agentAnswer: session.agent_answer || null,
-    agentIce: session.agent_ice || [],
-    ice: publicIceConfig(),
-  };
-}
-
-function publicAgentSession(session) {
-  const base = publicSession(session);
-  if (!base) return null;
-  return {
-    ...base,
-    browserOffer: session.browser_offer || null,
-    browserIce: session.browser_ice || [],
   };
 }
 
@@ -309,12 +213,7 @@ module.exports = {
   expireRemoteDesktopSession,
   getRemoteDesktopSessionForAgent,
   getRemoteDesktopSessionForUser,
-  listPendingRemoteDesktopSessions,
-  publicAgentSession,
   publicSession,
-  setRemoteDesktopAnswer,
-  setRemoteDesktopIce: appendRemoteDesktopIce,
-  setRemoteDesktopOffer,
   setRemoteDesktopStatus,
   sessionExpired,
 };

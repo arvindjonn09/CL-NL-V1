@@ -25,6 +25,10 @@ type ConnectState =
   | 'disconnected';
 
 const BINARY_MAGIC = 'RDF1';
+const MOUSE_MOVE_COALESCE_MS = 30;
+const VIEWPORT_UPDATE_DEBOUNCE_MS = 200;
+const MAX_VIEWPORT_TARGET_WIDTH = 1920;
+const MAX_VIEWPORT_TARGET_HEIGHT = 1080;
 
 export default function DesktopViewerPage() {
   const params = useParams<{ id: string }>();
@@ -39,9 +43,17 @@ export default function DesktopViewerPage() {
   const viewerRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const sessionRef = useRef<DesktopSession | null>(null);
-  const drawingRef = useRef(false);
-  const pendingFrameRef = useRef<RemoteDesktopFrame | null>(null);
+  const latestFrameRef = useRef<RemoteDesktopFrame | null>(null);
+  const renderingFrameRef = useRef(false);
+  const renderLoopRef = useRef<number | null>(null);
   const mediaActivatedRef = useRef(false);
+  const connectStartedAtRef = useRef<number | null>(null);
+  const firstFrameReceivedRef = useRef(false);
+  const firstFrameRenderedRef = useRef(false);
+  const latestMouseMoveRef = useRef<{ xRatio: number; yRatio: number } | null>(null);
+  const mouseMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastViewportRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -65,6 +77,9 @@ export default function DesktopViewerPage() {
 
     async function start() {
       try {
+        connectStartedAtRef.current = performance.now();
+        firstFrameReceivedRef.current = false;
+        firstFrameRenderedRef.current = false;
         const res = await fetch(remoteAccessApiUrl(`/api/remoteaccess/devices/${encodeURIComponent(id)}/connect`), {
           method: 'POST',
           credentials: 'include',
@@ -85,6 +100,7 @@ export default function DesktopViewerPage() {
           return;
         }
         sessionRef.current = session;
+        logConnectTiming('session created');
         openSocket(session);
       } catch {
         if (!cancelled) {
@@ -99,8 +115,29 @@ export default function DesktopViewerPage() {
       cancelled = true;
       socketRef.current?.close();
       socketRef.current = null;
+      stopRenderLoop();
+      clearMouseMoveTimer();
+      clearViewportTimer();
     };
+  // The connect effect is keyed only by device id; helper functions read current refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const resizeObserver = viewer && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(scheduleViewportUpdate)
+      : null;
+    if (viewer && resizeObserver) resizeObserver.observe(viewer);
+    window.addEventListener('resize', scheduleViewportUpdate);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleViewportUpdate);
+      clearViewportTimer();
+    };
+  // Viewport updates are debounced and sent through the current socket ref.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function openSocket(session: DesktopSession) {
     const socket = new WebSocket(
@@ -109,18 +146,26 @@ export default function DesktopViewerPage() {
     socket.binaryType = 'arraybuffer';
     socketRef.current = socket;
     mediaActivatedRef.current = false;
-    pendingFrameRef.current = null;
-    drawingRef.current = false;
+    latestFrameRef.current = null;
+    renderingFrameRef.current = false;
+    startRenderLoop();
 
     socket.onopen = () => {
       setState('waiting');
       setMessage('WebSocket connected. Waiting for desktop frames...');
+      logConnectTiming('browser websocket open');
+      sendViewportUpdate();
     };
 
     socket.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer) {
         void parseBinaryFrame(event.data).then((frame) => {
-          if (frame) void drawFrame(frame);
+          if (!frame) return;
+          if (!firstFrameReceivedRef.current) {
+            firstFrameReceivedRef.current = true;
+            logConnectTiming('first frame received');
+          }
+          latestFrameRef.current = frame;
         });
         return;
       }
@@ -136,6 +181,7 @@ export default function DesktopViewerPage() {
     socket.onclose = (event) => {
       if (socketRef.current === socket) {
         socketRef.current = null;
+        latestFrameRef.current = null;
         setState('disconnected');
         setMessage(event.reason || 'Remote desktop disconnected.');
       }
@@ -162,35 +208,51 @@ export default function DesktopViewerPage() {
     return { ...header, blob: new Blob([data.slice(headerEnd)], { type: 'image/jpeg' }) };
   }
 
+  function startRenderLoop() {
+    if (renderLoopRef.current !== null) return;
+    const tick = () => {
+      if (!renderingFrameRef.current && latestFrameRef.current) {
+        const frame = latestFrameRef.current;
+        latestFrameRef.current = null;
+        renderingFrameRef.current = true;
+        void drawFrame(frame).finally(() => {
+          renderingFrameRef.current = false;
+        });
+      }
+      renderLoopRef.current = window.requestAnimationFrame(tick);
+    };
+    renderLoopRef.current = window.requestAnimationFrame(tick);
+  }
+
+  function stopRenderLoop() {
+    if (renderLoopRef.current !== null) {
+      window.cancelAnimationFrame(renderLoopRef.current);
+      renderLoopRef.current = null;
+    }
+    latestFrameRef.current = null;
+    renderingFrameRef.current = false;
+  }
+
   async function drawFrame(frame: RemoteDesktopFrame) {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (drawingRef.current) {
-      pendingFrameRef.current = frame;
-      return;
-    }
-    drawingRef.current = true;
-    const image = new Image();
-    image.decoding = 'async';
-    const finish = () => {
-      URL.revokeObjectURL(image.src);
-      drawingRef.current = false;
-      const next = pendingFrameRef.current;
-      pendingFrameRef.current = null;
-      if (next) void drawFrame(next);
-    };
-    image.onload = () => {
-      const w = frame.width || image.naturalWidth;
-      const h = frame.height || image.naturalHeight;
+    let bitmap: ImageBitmap | null = null;
+    try {
+      bitmap = await createImageBitmap(frame.blob);
+      const w = frame.width || bitmap.width;
+      const h = frame.height || bitmap.height;
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
-      canvas.getContext('2d')?.drawImage(image, 0, 0);
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
       setFrameSize({ width: w, height: h });
+      if (!firstFrameRenderedRef.current) {
+        firstFrameRenderedRef.current = true;
+        logConnectTiming('first frame rendered');
+      }
       void markMediaActive(frame.sessionId);
-      finish();
-    };
-    image.onerror = finish;
-    image.src = URL.createObjectURL(frame.blob);
+    } finally {
+      bitmap?.close();
+    }
   }
 
   async function markMediaActive(sessionId: string) {
@@ -237,6 +299,78 @@ export default function DesktopViewerPage() {
     socket.send(JSON.stringify({ type, ...payload }));
   }
 
+  function logConnectTiming(label: string) {
+    const startedAt = connectStartedAtRef.current;
+    if (startedAt === null) return;
+    console.info(`[remote-desktop] ${label}`, {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      deviceId: id,
+      sessionId: sessionRef.current?.id || null,
+    });
+  }
+
+  function clearMouseMoveTimer() {
+    if (mouseMoveTimerRef.current !== null) {
+      clearTimeout(mouseMoveTimerRef.current);
+      mouseMoveTimerRef.current = null;
+    }
+  }
+
+  function clearViewportTimer() {
+    if (viewportTimerRef.current !== null) {
+      clearTimeout(viewportTimerRef.current);
+      viewportTimerRef.current = null;
+    }
+  }
+
+  function scheduleViewportUpdate() {
+    clearViewportTimer();
+    viewportTimerRef.current = setTimeout(() => {
+      viewportTimerRef.current = null;
+      sendViewportUpdate();
+    }, VIEWPORT_UPDATE_DEBOUNCE_MS);
+  }
+
+  function sendViewportUpdate() {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const rect = viewer.getBoundingClientRect();
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const target = fitSize(
+      Math.max(1, Math.round(rect.width * dpr)),
+      Math.max(1, Math.round(rect.height * dpr)),
+      MAX_VIEWPORT_TARGET_WIDTH,
+      MAX_VIEWPORT_TARGET_HEIGHT
+    );
+    const viewportKey = `${target.width}x${target.height}:${dpr}`;
+    if (lastViewportRef.current === viewportKey) return;
+    lastViewportRef.current = viewportKey;
+    sendControl('viewport', {
+      width: target.width,
+      height: target.height,
+      scaleMode: 'fit',
+      devicePixelRatio: dpr,
+    });
+  }
+
+  function flushMouseMove() {
+    const latest = latestMouseMoveRef.current;
+    latestMouseMoveRef.current = null;
+    clearMouseMoveTimer();
+    if (latest) sendControl('mouse_move', latest);
+  }
+
+  function sendCoalescedMouseMove(event: React.MouseEvent<HTMLCanvasElement>) {
+    latestMouseMoveRef.current = pointerRatio(event);
+    if (mouseMoveTimerRef.current !== null) return;
+    mouseMoveTimerRef.current = setTimeout(() => {
+      mouseMoveTimerRef.current = null;
+      const latest = latestMouseMoveRef.current;
+      latestMouseMoveRef.current = null;
+      if (latest) sendControl('mouse_move', latest);
+    }, MOUSE_MOVE_COALESCE_MS);
+  }
+
   function pointerRatio(event: React.MouseEvent<HTMLCanvasElement>) {
     const w = Math.max(1, event.currentTarget.clientWidth);
     const h = Math.max(1, event.currentTarget.clientHeight);
@@ -272,6 +406,7 @@ export default function DesktopViewerPage() {
         tabIndex={0}
         onKeyDown={(e) => { e.preventDefault(); sendControl('key_down', { key: e.key, code: e.code }); }}
         onKeyUp={(e) => { e.preventDefault(); sendControl('key_up', { key: e.key, code: e.code }); }}
+        onMouseEnter={scheduleViewportUpdate}
       >
         {!isLive && !frameSize && (
           <div style={overlay}>
@@ -289,9 +424,9 @@ export default function DesktopViewerPage() {
         <canvas
           ref={canvasRef}
           style={frameSize ? canvasVisible : canvasHidden}
-          onMouseMove={(e) => sendControl('mouse_move', pointerRatio(e))}
-          onMouseDown={(e) => sendControl('mouse_down', { ...pointerRatio(e), button: e.button })}
-          onMouseUp={(e) => sendControl('mouse_up', { ...pointerRatio(e), button: e.button })}
+          onMouseMove={sendCoalescedMouseMove}
+          onMouseDown={(e) => { flushMouseMove(); sendControl('mouse_down', { ...pointerRatio(e), button: e.button }); }}
+          onMouseUp={(e) => { flushMouseMove(); sendControl('mouse_up', { ...pointerRatio(e), button: e.button }); }}
           onContextMenu={(e) => e.preventDefault()}
           aria-label="Remote desktop"
         />
@@ -312,6 +447,14 @@ function stateDot(state: ConnectState): React.CSSProperties {
     borderRadius: '50%',
     background: color,
     flexShrink: 0,
+  };
+}
+
+function fitSize(width: number, height: number, maxWidth: number, maxHeight: number) {
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
   };
 }
 
@@ -397,7 +540,8 @@ const canvasVisible: React.CSSProperties = {
   maxHeight: '100%',
   objectFit: 'contain',
   display: 'block',
-  cursor: 'crosshair',
+  cursor: 'default',
+  imageRendering: 'pixelated',
 };
 
 const canvasHidden: React.CSSProperties = {

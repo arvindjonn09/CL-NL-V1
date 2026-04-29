@@ -282,10 +282,6 @@ function createRemoteDataPool() {
           status: 'waiting_for_agent',
           signaling_state: 'waiting_for_agent',
           transport_state: 'waiting_for_agent',
-          browser_offer: null,
-          agent_answer: null,
-          browser_ice: [],
-          agent_ice: [],
           created_at: now,
           expires_at: new Date(Date.now() + Number(params[4]) * 1000),
           started_at: null,
@@ -318,48 +314,6 @@ function createRemoteDataPool() {
           .filter((session) => session.device_id === params[0] && session.remote_user_identity === params[1])
           .slice(0, 5);
         return { rowCount: rows.length, rows };
-      }
-
-      if (sql.includes('FROM remote_desktop_sessions') && sql.includes("status IN ('waiting_for_agent', 'signaling', 'media_starting')")) {
-        const rows = desktopSessions
-          .filter((session) => session.device_id === params[0] && ['waiting_for_agent', 'signaling', 'media_starting'].includes(session.status) && session.expires_at > new Date())
-          .slice(0, params[1] || 5);
-        return { rowCount: rows.length, rows };
-      }
-
-      if (sql.includes('UPDATE remote_desktop_sessions') && sql.includes('browser_offer')) {
-        const found = desktopSessions.find((session) => session.id === params[0] && ['waiting_for_agent', 'signaling', 'media_starting'].includes(session.status) && session.expires_at > new Date());
-        if (found) {
-          found.browser_offer = JSON.parse(params[1]);
-          found.status = 'waiting_for_agent';
-          found.signaling_state = 'offer-received';
-          found.transport_state = 'waiting_for_agent';
-          found.updated_at = now;
-        }
-        return { rowCount: found ? 1 : 0, rows: found ? [found] : [] };
-      }
-
-      if (sql.includes('UPDATE remote_desktop_sessions') && sql.includes('agent_answer')) {
-        const found = desktopSessions.find((session) => session.id === params[0] && ['waiting_for_agent', 'signaling', 'media_starting'].includes(session.status) && session.expires_at > new Date());
-        if (found) {
-          found.agent_answer = JSON.parse(params[1]);
-          found.status = 'media_starting';
-          found.signaling_state = 'answer-received';
-          found.transport_state = 'media_starting';
-          found.updated_at = now;
-        }
-        return { rowCount: found ? 1 : 0, rows: found ? [found] : [] };
-      }
-
-      if (sql.includes('UPDATE remote_desktop_sessions') && (sql.includes('browser_ice') || sql.includes('agent_ice'))) {
-        const found = desktopSessions.find((session) => session.id === params[0] && ['waiting_for_agent', 'signaling', 'media_starting', 'connected'].includes(session.status) && session.expires_at > new Date());
-        if (found) {
-          const column = sql.includes('agent_ice') ? 'agent_ice' : 'browser_ice';
-          found[column] = [...(found[column] || []), ...JSON.parse(params[1])];
-          found.signaling_state = found.signaling_state === 'requested' ? found.signaling_state : 'ice-exchange';
-          found.updated_at = now;
-        }
-        return { rowCount: found ? 1 : 0, rows: found ? [found] : [] };
       }
 
       if (sql.includes('UPDATE remote_desktop_sessions') && sql.includes('transport_state = $2')) {
@@ -711,75 +665,6 @@ test('remote desktop connect is blocked when agent capture runtime is not ready'
   assert.equal(pool.desktopSessions.length, 0);
 });
 
-test('remote desktop signaling accepts browser offer and agent answer for authorized session', async () => {
-  const pool = createRemoteDataPool();
-  const userStore = createRemoteUserStore([{
-    email: 'user@example.com',
-    password: 'secret',
-    deviceScopeMode: 'selected',
-    deviceIds: ['device-1'],
-  }]);
-  const session = await createRemoteAccessSession(pool, 'user@example.com', createReq());
-  const app = createApp();
-  registerRemoteAccessRoutes(app, {
-    pool,
-    userStore,
-    getConnectedAgent: () => ({ readyState: 1 }),
-  });
-  registerRemoteDesktopRoutes(app, {
-    pool,
-    userStore,
-    agentAuthMiddleware: (_req, _res, next) => next(),
-  });
-
-  const connectReq = createReq();
-  connectReq.params = { id: 'device-1' };
-  connectReq.cookies.remote_access_session = session.accessToken;
-  const connectRes = createRes();
-  await runHandlers(app.routes['POST /api/remoteaccess/devices/:id/connect'], connectReq, connectRes);
-  const desktopSessionId = connectRes.body.desktopSession.id;
-
-  const offerReq = createReq({ offer: { type: 'offer', sdp: 'v=0' } });
-  offerReq.params = { id: desktopSessionId };
-  offerReq.cookies.remote_access_session = session.accessToken;
-  const offerRes = createRes();
-  await runHandlers(app.routes['POST /api/remoteaccess/desktop/sessions/:id/offer'], offerReq, offerRes);
-
-  assert.equal(offerRes.statusCode, 200);
-  assert.equal(offerRes.body.session.status, 'waiting_for_agent');
-  assert.equal(pool.desktopSessions[0].browser_offer.type, 'offer');
-
-  const answerReq = createReq({ deviceId: 'device-1', answer: { type: 'answer', sdp: 'v=0' } });
-  answerReq.params = { id: desktopSessionId };
-  const answerRes = createRes();
-  await runHandlers(app.routes['POST /api/agent/remote-desktop/sessions/:id/answer'], answerReq, answerRes);
-
-  assert.equal(answerRes.statusCode, 200);
-  assert.equal(answerRes.body.session.status, 'media_starting');
-  assert.equal(pool.desktopSessions[0].agent_answer.type, 'answer');
-});
-
-test('invalid remote desktop signaling attempts are denied', async () => {
-  const pool = createRemoteDataPool();
-  const userStore = createRemoteUserStore([{
-    email: 'user@example.com',
-    password: 'secret',
-    deviceScopeMode: 'selected',
-    deviceIds: ['device-1'],
-  }]);
-  const session = await createRemoteAccessSession(pool, 'user@example.com', createReq());
-  const app = createApp();
-  registerRemoteDesktopRoutes(app, { pool, userStore });
-
-  const req = createReq({ offer: { type: 'offer', sdp: 'v=0' } });
-  req.params = { id: 'missing-session' };
-  req.cookies.remote_access_session = session.accessToken;
-  const res = createRes();
-  await runHandlers(app.routes['POST /api/remoteaccess/desktop/sessions/:id/offer'], req, res);
-
-  assert.equal(res.statusCode, 404);
-});
-
 test('remote desktop connected state requires browser-confirmed media', async () => {
   const pool = createRemoteDataPool();
   const userStore = createRemoteUserStore([{
@@ -815,14 +700,9 @@ test('remote desktop connected state requires browser-confirmed media', async ()
   await runHandlers(app.routes['POST /api/remoteaccess/desktop/sessions/:id/media-active'], earlyMediaReq, earlyMediaRes);
   assert.equal(earlyMediaRes.statusCode, 409);
 
-  const offerReq = createReq({ offer: { type: 'offer', sdp: 'v=0' } });
-  offerReq.params = { id: desktopSessionId };
-  offerReq.cookies.remote_access_session = session.accessToken;
-  await runHandlers(app.routes['POST /api/remoteaccess/desktop/sessions/:id/offer'], offerReq, createRes());
-
-  const answerReq = createReq({ deviceId: 'device-1', answer: { type: 'answer', sdp: 'v=0' } });
-  answerReq.params = { id: desktopSessionId };
-  await runHandlers(app.routes['POST /api/agent/remote-desktop/sessions/:id/answer'], answerReq, createRes());
+  const statusReq = createReq({ deviceId: 'device-1', status: 'media_starting', reason: 'agent websocket relay publishing jpeg frames' });
+  statusReq.params = { id: desktopSessionId };
+  await runHandlers(app.routes['POST /api/agent/remote-desktop/sessions/:id/status'], statusReq, createRes());
   assert.equal(pool.desktopSessions[0].status, 'media_starting');
 
   const mediaReq = createReq();

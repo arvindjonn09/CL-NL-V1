@@ -56,7 +56,6 @@ type DeviceDetail = {
     label?: string | null;
     runtime?: {
       relay?: string;
-      webrtcSignaling?: string;
       screenCapture?: string;
       input?: string;
     };
@@ -174,7 +173,7 @@ export default function RemoteAccessDevicePage() {
               <h2 style={sectionTitle}>Remote Desktop</h2>
               <p style={muted}>{detail.remoteDesktop?.label || detail.remoteConnect?.label || 'Remote desktop is not available.'}</p>
               <div style={capabilityGrid}>
-                <DetailItem label="Relay" value={detail.remoteDesktop?.runtime?.relay || detail.remoteDesktop?.runtime?.webrtcSignaling || 'unavailable'} />
+                <DetailItem label="Relay" value={detail.remoteDesktop?.runtime?.relay || 'unavailable'} />
                 <DetailItem label="Screen capture" value={detail.remoteDesktop?.runtime?.screenCapture || 'not_ready'} />
                 <DetailItem label="Input" value={detail.remoteDesktop?.runtime?.input || 'not_ready'} />
               </div>
@@ -331,11 +330,6 @@ const statePill: React.CSSProperties = {
   background: '#f8fafc',
   fontSize: '13px',
   fontWeight: 700,
-};
-
-const warning: React.CSSProperties = {
-  color: '#92400e',
-  fontSize: '14px',
 };
 
 const capabilityGrid: React.CSSProperties = {
