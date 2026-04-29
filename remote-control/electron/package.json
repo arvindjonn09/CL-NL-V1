@@ -1,0 +1,19 @@
+{
+  "name": "setulink-desktop",
+  "version": "1.0.0",
+  "description": "SetuLink Desktop Client",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.3"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

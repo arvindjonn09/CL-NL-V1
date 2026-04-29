@@ -159,6 +159,16 @@ func runRemoteDesktopRelay(ctx context.Context, cfg *Config, sessionID string, w
 		if err != nil {
 			return fmt.Errorf("read desktop helper pipe: %w", err)
 		}
+		if messageType == desktopPipeMessageJSON {
+			var message any
+			if err := json.Unmarshal(payload, &message); err != nil {
+				return fmt.Errorf("decode desktop helper json message: %w", err)
+			}
+			if err := writeJSON(message); err != nil {
+				return fmt.Errorf("send desktop helper json message: %w", err)
+			}
+			continue
+		}
 		if messageType != desktopPipeMessageFrame {
 			continue
 		}
@@ -227,5 +237,10 @@ func ProcessRemoteDesktopRelayControl(sessionID string, payload json.RawMessage)
 		return fmt.Errorf("remote desktop helper pipe is not connected")
 	}
 
+	var control map[string]any
+	if err := json.Unmarshal(payload, &control); err == nil {
+		control["sessionId"] = sessionID
+		payload, _ = json.Marshal(control)
+	}
 	return writeDesktopPipeMessage(active.pipe, desktopPipeMessageInput, payload)
 }

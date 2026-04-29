@@ -31,6 +31,7 @@ const (
 	desktopPipeMessageInput byte = 0x02
 	desktopPipeMessagePing  byte = 0x03
 	desktopPipeMessagePong  byte = 0x04
+	desktopPipeMessageJSON  byte = 0x05
 	desktopPipeMessageStop  byte = 0xff
 )
 

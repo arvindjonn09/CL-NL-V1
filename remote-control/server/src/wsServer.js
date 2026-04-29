@@ -93,6 +93,11 @@ function initWebSocket(server, options = {}) {
           relayRemoteDesktopStatus(data.sessionId, data);
           return;
         }
+
+        if (data.type === 'remote-desktop-clipboard' && data.sessionId) {
+          relayRemoteDesktopClipboard(data.sessionId, data);
+          return;
+        }
       } catch (err) {
         console.error('WebSocket message error:', err);
       }
@@ -205,6 +210,10 @@ async function acceptRemoteDesktopBrowser(ws, req, { pool, userStore }) {
 
         if (isBinary) return;
         const control = JSON.parse(message.toString());
+        if (control.type === 'session.heartbeat') {
+          ws.send(JSON.stringify(control));
+          return;
+        }
         agent.send(JSON.stringify({
           type: 'remote-desktop-control',
           sessionId,
@@ -403,6 +412,15 @@ function relayRemoteDesktopStatus(sessionId, status) {
     sessionId,
     status: status.status,
     reason: status.reason || null,
+  });
+}
+
+function relayRemoteDesktopClipboard(sessionId, message) {
+  sendToRemoteDesktopBrowsers(sessionId, {
+    type: 'remote-desktop-clipboard',
+    sessionId,
+    text: typeof message.text === 'string' ? message.text : '',
+    byteLen: Number(message.byteLen || 0),
   });
 }
 

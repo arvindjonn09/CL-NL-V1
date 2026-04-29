@@ -4,6 +4,7 @@ import "encoding/json"
 
 type ControlMessage struct {
 	Type             string  `json:"type"`
+	SessionID        string  `json:"sessionId,omitempty"`
 	X                int     `json:"x,omitempty"`
 	Y                int     `json:"y,omitempty"`
 	XRatio           float64 `json:"xRatio,omitempty"`
@@ -15,6 +16,14 @@ type ControlMessage struct {
 	Height           int     `json:"height,omitempty"`
 	ScaleMode        string  `json:"scaleMode,omitempty"`
 	DevicePixelRatio float64 `json:"devicePixelRatio,omitempty"`
+	Action           string  `json:"action,omitempty"`
+	VkCode           uint16  `json:"vkCode,omitempty"`
+	ScanCode         uint16  `json:"scanCode,omitempty"`
+	Extended         bool    `json:"extended,omitempty"`
+	Seq              uint64  `json:"seq,omitempty"`
+	Ts               int64   `json:"ts,omitempty"`
+	Payload          string  `json:"payload,omitempty"`
+	ByteLen          int     `json:"byteLen,omitempty"`
 }
 
 func DecodeControlMessage(data []byte) (ControlMessage, error) {

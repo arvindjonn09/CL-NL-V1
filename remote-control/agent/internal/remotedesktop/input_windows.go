@@ -77,6 +77,15 @@ func InjectInput(message ControlMessage) error {
 		return sendKey(virtualKey(message), false)
 	case "key_up":
 		return sendKey(virtualKey(message), true)
+	case "input.keyboard":
+		return sendVKCode(message.VkCode, message.Action == "up", message.Extended)
+	case "system.sas":
+		return TriggerSAS()
+	case "clipboard.push":
+		if message.ByteLen > 2*1024*1024 {
+			return fmt.Errorf("clipboard payload too large: %d bytes", message.ByteLen)
+		}
+		return WriteClipboard(message.Payload)
 	default:
 		return nil
 	}
@@ -145,6 +154,21 @@ func sendKey(vk uint16, up bool) error {
 	flags := uint32(0)
 	if up {
 		flags = keyEventFKeyUp
+	}
+	event := input{Type: inputKeyboard, Ki: keyboardInput{WVk: vk, DwFlags: flags}}
+	return sendInput(unsafe.Pointer(&event), unsafe.Sizeof(event))
+}
+
+func sendVKCode(vk uint16, up bool, extended bool) error {
+	if vk == 0 {
+		return nil
+	}
+	flags := uint32(0)
+	if up {
+		flags |= keyEventFKeyUp
+	}
+	if extended {
+		flags |= 0x0001
 	}
 	event := input{Type: inputKeyboard, Ki: keyboardInput{WVk: vk, DwFlags: flags}}
 	return sendInput(unsafe.Pointer(&event), unsafe.Sizeof(event))

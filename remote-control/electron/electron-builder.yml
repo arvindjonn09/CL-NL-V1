@@ -1,0 +1,21 @@
+appId: com.setulink.desktop
+productName: SetuLink Desktop
+directories:
+  output: dist
+files:
+  - src/**
+  - package.json
+win:
+  target: nsis
+  icon: assets/icon.ico
+mac:
+  target: dmg
+  icon: assets/icon.icns
+linux:
+  target: AppImage
+  icon: assets/icon.png
+nsis:
+  oneClick: false
+  allowDirChange: true
+  installerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico

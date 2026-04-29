@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -195,6 +196,23 @@ func runHelperControlLoop(ctx context.Context, conn desktopPipeConn, writeMsg fu
 			}
 			if control.Type == "viewport" {
 				captureState.setViewport(control)
+				continue
+			}
+			if control.Type == "clipboard.pull" {
+				text, err := agentremotedesktop.ReadClipboard()
+				if err != nil {
+					continue
+				}
+				response, err := json.Marshal(map[string]any{
+					"type":      "remote-desktop-clipboard",
+					"sessionId": opts.SessionID,
+					"text":      text,
+					"byteLen":   len([]byte(text)),
+				})
+				if err != nil {
+					continue
+				}
+				_ = writeMsg(desktopPipeMessageJSON, response)
 				continue
 			}
 			_ = agentremotedesktop.InjectInput(control)
